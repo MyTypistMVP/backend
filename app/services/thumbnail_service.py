@@ -24,6 +24,7 @@ try:
     import fitz  # PyMuPDF
     PYMUPDF_AVAILABLE = True
 except ImportError:
+    fitz = None
     PYMUPDF_AVAILABLE = False
 
 # Alternative PDF processing
@@ -31,6 +32,8 @@ try:
     from pdf2image import convert_from_path, convert_from_bytes
     PDF2IMAGE_AVAILABLE = True
 except ImportError:
+    convert_from_path = None
+    convert_from_bytes = None
     PDF2IMAGE_AVAILABLE = False
 
 # Document processing
@@ -39,6 +42,7 @@ try:
     from docx.shared import Inches
     DOCX_AVAILABLE = True
 except ImportError:
+    DocxDocument = None
     DOCX_AVAILABLE = False
 
 from config import settings
