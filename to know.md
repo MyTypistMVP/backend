@@ -37,4 +37,6 @@ g. i already told you alot of Properties and inputs but the admin shoud have opt
 
 6. Taking about conversionnd seo make sure the templates and landing in a way that our document contents can actual be seen by the search engine and others can just easily see our document template preview content , description and for outsiders no price tag just meta
 
-7 As you ar
+7. 
+
+8. And there are many things that i want to add but i dont know them but i already have them on the codebase and during the project
