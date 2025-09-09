@@ -37,13 +37,8 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Security
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1", "*.mytypist.com", "*.replit.dev", "*"]
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:5000",
-        "https://app.mytypist.com",
-        "https://*.replit.dev"
-    ]
+    ALLOWED_HOSTS: List[str] = ["*"]  # Allow all hosts for Replit proxy
+    ALLOWED_ORIGINS: List[str] = ["*"]  # Allow all origins for development in Replit
 
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100
