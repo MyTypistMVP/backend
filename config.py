@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "MyTypist"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = False
+    DEBUG: bool = True
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-this")
 
     # Database
@@ -37,11 +37,12 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Security
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1", "*.mytypist.com"]
+    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1", "*.mytypist.com", "*.replit.dev", "*"]
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5000",
-        "https://app.mytypist.com"
+        "https://app.mytypist.com",
+        "https://*.replit.dev"
     ]
 
     # Rate Limiting
