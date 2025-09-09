@@ -2,10 +2,13 @@
 Payment processing background tasks
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from celery import Celery
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from config import settings
 from database import SessionLocal
@@ -256,14 +259,10 @@ def send_payment_success_notification(user: User, payment: Payment):
     # Send real email notification with error handling
     try:
         from app.services.email_service import email_service
-        await email_service.send_payment_confirmation_email(
-            user_email=user.email,
-            user_name=user.full_name or user.email,
-            amount=100.0,  # This would be the actual amount
-            currency="NGN",
-            transaction_id="TXN_ID",
-            tokens_purchased=100
-        )
+        # TODO: Fix async call - for now just log
+        logger.info(f"Would send payment confirmation email to {user.email}")
+        # Commented out async call that needs proper handling:
+        # await email_service.send_payment_confirmation_email(...)
     except Exception as e:
         logger.warning(f"Failed to send payment email: {e}")
     # EmailService.send_payment_success_email(user.email, payment)
@@ -279,14 +278,10 @@ def send_payment_failure_notification(user: User, payment: Payment):
     # Send real email notification with error handling
     try:
         from app.services.email_service import email_service
-        await email_service.send_payment_confirmation_email(
-            user_email=user.email,
-            user_name=user.full_name or user.email,
-            amount=100.0,  # This would be the actual amount
-            currency="NGN",
-            transaction_id="TXN_ID",
-            tokens_purchased=100
-        )
+        # TODO: Fix async call - for now just log
+        logger.info(f"Would send payment failure email to {user.email}")
+        # Commented out async call that needs proper handling:
+        # await email_service.send_payment_confirmation_email(...)
     except Exception as e:
         logger.warning(f"Failed to send payment email: {e}")
     # EmailService.send_payment_failure_email(user.email, payment)
@@ -302,14 +297,10 @@ def send_subscription_renewal_notification(user: User, payment: Payment):
     # Send real email notification with error handling
     try:
         from app.services.email_service import email_service
-        await email_service.send_payment_confirmation_email(
-            user_email=user.email,
-            user_name=user.full_name or user.email,
-            amount=100.0,  # This would be the actual amount
-            currency="NGN",
-            transaction_id="TXN_ID",
-            tokens_purchased=100
-        )
+        # TODO: Fix async call - for now just log
+        logger.info(f"Would send subscription renewal email to {user.email}")
+        # Commented out async call that needs proper handling:
+        # await email_service.send_payment_confirmation_email(...)
     except Exception as e:
         logger.warning(f"Failed to send payment email: {e}")
     # EmailService.send_subscription_renewal_email(user.email, payment)

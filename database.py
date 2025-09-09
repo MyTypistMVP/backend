@@ -26,51 +26,24 @@ engine = create_engine(
     pool_reset_on_return='commit',       # Clean state on return
     connect_args={
         "connect_timeout": 30,
-        "command_timeout": 60,
-        "application_name": "MyTypist-Production-Backend",
-        "options": "-c default_transaction_isolation=read_committed -c jit=off -c shared_preload_libraries=pg_stat_statements"
+        "application_name": "MyTypist-Production-Backend"
     },
     echo=settings.DEBUG,
     echo_pool=settings.DEBUG
 )
 
-# Advanced PostgreSQL optimizations
-@event.listens_for(engine, "connect")
-def set_postgresql_optimizations(dbapi_connection, connection_record):
-    """Apply production PostgreSQL optimizations"""
-    try:
-        with dbapi_connection.cursor() as cursor:
-            # Connection-level optimizations
-            cursor.execute("SET work_mem = '256MB'")
-            cursor.execute("SET maintenance_work_mem = '512MB'")
-            cursor.execute("SET effective_cache_size = '4GB'")
-            cursor.execute("SET random_page_cost = 1.1")
-            cursor.execute("SET seq_page_cost = 1.0")
-            cursor.execute("SET cpu_tuple_cost = 0.01")
-            cursor.execute("SET cpu_index_tuple_cost = 0.005")
-            cursor.execute("SET cpu_operator_cost = 0.0025")
-
-            # Query optimization
-            cursor.execute("SET enable_hashjoin = on")
-            cursor.execute("SET enable_mergejoin = on")
-            cursor.execute("SET enable_nestloop = on")
-            cursor.execute("SET enable_seqscan = on")
-            cursor.execute("SET enable_indexscan = on")
-            cursor.execute("SET enable_bitmapscan = on")
-
-            # Concurrency and locking
-            cursor.execute("SET default_transaction_isolation = 'read committed'")
-            cursor.execute("SET lock_timeout = '30s'")
-            cursor.execute("SET statement_timeout = '300s'")
-
-            # Logging and monitoring
-            cursor.execute("SET log_statement_stats = off")
-            cursor.execute("SET log_duration = off")
-            cursor.execute("SET log_min_duration_statement = 1000")
-
-        logger.info("PostgreSQL connection optimizations applied successfully")
-    except Exception as e:
-        logger.warning(f"Failed to apply PostgreSQL optimizations: {e}")
+# Advanced PostgreSQL optimizations - commented out for hosted databases
+# @event.listens_for(engine, "connect")
+# def set_postgresql_optimizations(dbapi_connection, connection_record):
+#     """Apply production PostgreSQL optimizations"""
+#     try:
+#         with dbapi_connection.cursor() as cursor:
+#             # Basic safe optimizations that work on hosted databases
+#             cursor.execute("SET work_mem = '16MB'")
+#             cursor.execute("SET statement_timeout = '300s'")
+#         logger.info("PostgreSQL connection optimizations applied successfully")
+#     except Exception as e:
+#         logger.warning(f"Failed to apply PostgreSQL optimizations: {e}")
 
 # Connection pool monitoring
 @event.listens_for(engine, "checkout")

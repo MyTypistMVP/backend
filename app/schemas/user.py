@@ -24,7 +24,7 @@ class UserCreate(UserBase):
     """User creation schema"""
     password: str = Field(..., min_length=8, max_length=128)
     confirm_password: str
-    role: UserRole = UserRole.STANDARD
+    role: UserRole = UserRole.USER
     gdpr_consent: bool = True
     marketing_consent: bool = False
     

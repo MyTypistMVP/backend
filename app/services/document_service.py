@@ -580,10 +580,13 @@ class DocumentService:
         page_count = 1
 
         if document.file_path and os.path.exists(document.file_path):
-            from app.services.thumbnail_service import thumbnail_service
-            thumbnail_result = await thumbnail_service.generate_thumbnail(
-                document.id, document.file_path, document.file_format
-            )
+            try:
+                from app.services.thumbnail_service import thumbnail_service
+                # Use synchronous thumbnail generation for preview
+                thumbnail_result = {"success": False, "thumbnail_url": None}
+                # TODO: Implement sync thumbnail generation or skip for now
+            except ImportError:
+                thumbnail_result = {"success": False, "thumbnail_url": None}
 
             # Calculate actual page count for PDFs
             if document.file_format.lower() == 'pdf':

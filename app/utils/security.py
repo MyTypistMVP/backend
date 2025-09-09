@@ -5,7 +5,7 @@ Security utility functions
 from jose import jwt
 from datetime import datetime
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -295,3 +295,22 @@ class SecurityHeaders:
             response.headers[header] = value
         
         return response
+
+
+def get_client_ip(request: Request) -> str:
+    """Get client IP address from request"""
+    
+    # Check for X-Forwarded-For header (proxy/load balancer)
+    x_forwarded_for = request.headers.get("X-Forwarded-For")
+    if x_forwarded_for:
+        # Take the first IP in the chain
+        return x_forwarded_for.split(",")[0].strip()
+    
+    # Check for X-Real-IP header (nginx proxy)
+    x_real_ip = request.headers.get("X-Real-IP")
+    if x_real_ip:
+        return x_real_ip.strip()
+    
+    # Fall back to direct client IP
+    client_host = request.client.host if request.client else "unknown"
+    return client_host
