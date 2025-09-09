@@ -32,18 +32,32 @@ engine = create_engine(
     echo_pool=settings.DEBUG
 )
 
-# Advanced PostgreSQL optimizations - commented out for hosted databases
-# @event.listens_for(engine, "connect")
-# def set_postgresql_optimizations(dbapi_connection, connection_record):
-#     """Apply production PostgreSQL optimizations"""
-#     try:
-#         with dbapi_connection.cursor() as cursor:
-#             # Basic safe optimizations that work on hosted databases
-#             cursor.execute("SET work_mem = '16MB'")
-#             cursor.execute("SET statement_timeout = '300s'")
-#         logger.info("PostgreSQL connection optimizations applied successfully")
-#     except Exception as e:
-#         logger.warning(f"Failed to apply PostgreSQL optimizations: {e}")
+# Advanced PostgreSQL optimizations for production performance
+@event.listens_for(engine, "connect")
+def set_postgresql_optimizations(dbapi_connection, connection_record):
+    """Apply production PostgreSQL optimizations"""
+    try:
+        with dbapi_connection.cursor() as cursor:
+            # Memory optimizations
+            cursor.execute("SET work_mem = '32MB'")
+            cursor.execute("SET maintenance_work_mem = '128MB'")
+            cursor.execute("SET shared_buffers = '256MB'")
+            
+            # Performance optimizations
+            cursor.execute("SET statement_timeout = '300s'")
+            cursor.execute("SET lock_timeout = '30s'")
+            cursor.execute("SET idle_in_transaction_session_timeout = '60s'")
+            
+            # Query optimization
+            cursor.execute("SET random_page_cost = 1.1")  # SSD optimization
+            cursor.execute("SET effective_cache_size = '1GB'")
+            cursor.execute("SET cpu_tuple_cost = 0.01")
+            cursor.execute("SET cpu_index_tuple_cost = 0.005")
+            
+        logger.info("PostgreSQL production optimizations applied successfully")
+    except Exception as e:
+        logger.warning(f"Failed to apply PostgreSQL optimizations: {e}")
+        # Continue without optimizations rather than fail
 
 # Connection pool monitoring
 @event.listens_for(engine, "checkout")
