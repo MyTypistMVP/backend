@@ -115,7 +115,7 @@ MyTypist is a document template creation and management SaaS platform with the f
 
 ### Template Management
 - Upload document with immediate editing interface
-- Placeholder extraction and configuration
+- Placeholder extraction {} and configuration
 - Bulk pricing updates by category/tag
 - Template categorization and tagging system
 - Preview image and extraction document separation
@@ -229,7 +229,7 @@ After codebase improvements, consolidate to these essential docs:
 
 ## Final Notes
 
-This is an MVP for a startup company. Every feature must be:
+This is an company code. Every feature must be:
 - Production-ready and professional
 - Scalable and maintainable
 - User-friendly and intuitive
