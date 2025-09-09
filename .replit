@@ -5,7 +5,7 @@ integrations = ["python_sendgrid==1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "file", "freetype", "lcms2", "libGL", "libGLU", "libiconv", "libimagequant", "libjpeg", "libtiff", "libuv", "libwebp", "libxcrypt", "openjpeg", "openssl", "pkg-config", "poppler_utils", "redis", "rustc", "tcl", "tesseract", "tk", "xsimd", "zlib"]
+packages = ["cargo", "file", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libGL", "libGLU", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libuv", "libwebp", "libxcrypt", "mupdf", "openjpeg", "openssl", "pango", "pkg-config", "poppler_utils", "redis", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xsimd", "zlib"]
 
 [workflows]
 runButton = "Project"
