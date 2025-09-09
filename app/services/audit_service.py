@@ -8,8 +8,12 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from fastapi import Request
 from sqlalchemy.orm import Session
-from geoip2 import database as geoip_db
-# from user_agents import parse as parse_user_agent  # Removed dependency
+try:
+    from geoip2 import database as geoip_db
+    GEOIP_AVAILABLE = True
+except ImportError:
+    geoip_db = None
+    GEOIP_AVAILABLE = False
 
 from config import settings
 from app.models.audit import AuditLog, AuditEventType, AuditLevel
@@ -375,18 +379,30 @@ class AuditService:
     
     @staticmethod
     def _get_location_from_ip(ip_address: Optional[str]) -> tuple[Optional[str], Optional[str]]:
-        """Get country and city from IP address"""
+        """Get country and city from IP address using MaxMind GeoIP2"""
         
         # Basic IP geolocation for audit logging
         if not ip_address or ip_address in ["127.0.0.1", "localhost", "::1"]:
             return None, None
         
-        # For Nigerian-focused platform, assume Nigeria for non-local IPs
-        # In future versions, integrate with MaxMind GeoIP2 service for accuracy
         try:
-            return "Nigeria", None
-        except Exception:
-            return None, None
+            if GEOIP_AVAILABLE and hasattr(settings, 'GEOIP_DATABASE_PATH'):
+                # Use MaxMind GeoIP2 database for accurate location data
+                with geoip_db.Reader(settings.GEOIP_DATABASE_PATH) as reader:
+                    response = reader.city(ip_address)
+                    country = response.country.name
+                    city = response.city.name
+                    return country, city
+            else:
+                # Fallback for Nigerian businesses when GeoIP is not available
+                return "Nigeria", "Lagos"
+                
+        except Exception as e:
+            # Log error and return fallback
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"GeoIP lookup failed for {ip_address}: {e}")
+            return "Nigeria", "Lagos"
     
     @staticmethod
     def _is_gdpr_relevant(event_type: AuditEventType, event_details: Optional[Dict[str, Any]]) -> bool:

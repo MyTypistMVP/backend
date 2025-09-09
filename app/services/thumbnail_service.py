@@ -17,6 +17,9 @@ try:
     from PIL import Image, ImageDraw, ImageFont
     PIL_AVAILABLE = True
 except ImportError:
+    Image = None
+    ImageDraw = None
+    ImageFont = None
     PIL_AVAILABLE = False
 
 # PDF processing
