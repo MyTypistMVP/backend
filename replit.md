@@ -1,7 +1,7 @@
 # MyTypist Backend Documentation
 
 ## Current Status guide
-Firstly before you write any code read and understand every code and their connection to find any wrong pattern or connection before updating or writing more bad codes that would alwayss break and make sure to always update this file with current project status, tools, specs and everything that will make you know where we are on this project progress log, and also frequetly the project goal and requirements will improve so know that you are to always read and update the /doc folders always containing the current stage of the applicaton as the /attached_assets folder might contain files that we have upgraded requirements on, but it will be nice if you read it to understand the project
+Firstly before you write any code read and understand every code and their connection to find any wrong pattern or connection before updating or writing more bad codes that would alwayss break and make sure to always update this file with current project status, tools, specs and everything that will make you know where we are on this project progress log, and also frequetly the project goal and requirements will improve so know that you are to always read and update the (/doc) folders always containing the current stage of the applicaton as the (/attached_assets) folder might contain files that we have upgraded requirements on, but it will be nice if you read it to understand the project
 
 **Last Updated:** 2025-09-08
 
