@@ -1,0 +1,239 @@
+# MyTypist Backend Development Rules & Instructions
+
+## Project Overview
+MyTypist is a document template creation and management SaaS platform with the following core features:
+- Document template creation and editing with placeholder extraction
+- Token-based payment system with subscription plans
+- Multi-role system (Guest, User, Moderator, Admin)
+- Advanced document processing and batch operations
+- Comprehensive admin dashboard with analytics
+
+## Core Development Standards
+
+### 1. Production-Ready Code Only
+- **NO TODO comments** - implement actual functionality
+- **NO placeholder/mock implementations** - build real integrations
+- **NO "In production, this would..." comments** - implement production logic now
+- **NO commented-out code** - clean, working code only
+- **NO development-stage indicators** - this is production-ready code
+- Remove all comments like "Remove this for local development"
+
+### 2. Database Configuration
+- **PostgreSQL ONLY** - no SQLite, remove all SQLite references
+- Optimize PostgreSQL performance to maximum capacity
+- Use proper indexing and query optimization
+- Implement connection pooling and performance monitoring
+
+### 3. File Structure & Organization
+- **NO duplicate files** - upgrade existing files instead of creating new ones
+- **NO version indicators** (v2, enhanced, advanced) in file/route names
+- **NO conflicting routes** - clean, consistent API structure
+- Merge any duplicated functionality into main codebase
+- Follow single responsibility principle
+
+### 4. API Route Standards
+```
+✅ CORRECT: /api/auth/login
+❌ WRONG: /api/v2/auth/login, /api/auth/enhanced-login
+```
+- Clean, RESTful routes without version numbers
+- Consistent naming conventions
+- No duplicate endpoints
+
+### 5. Authentication & Security
+- Implement proper JWT token management
+- **NO 2FA or API key selling** - this is an MVP startup
+- Robust fraud detection for free token abuse
+- Advanced device/user tracking across browsers
+- Secure payment processing with card storage
+- Email verification system (non-blocking registration)
+
+## Role-Based System
+
+### Roles Hierarchy
+1. **Guest** - Can create 1 free document, view previews
+2. **User** - Token-based document creation, subscriptions
+3. **Moderator** - Content moderation, feedback management
+4. **Admin** - Full system control, analytics, template management
+
+### User Registration & Free Tokens
+- Guest users get 1 free document creation
+- Advanced fraud detection prevents abuse
+- Device fingerprinting and tracking
+- Free token only granted once per device/user combination
+- Seamless registration flow during document creation
+
+## Document Processing System
+
+### Placeholder Logic
+- **Signature placeholders**: File upload with background removal
+- **Address placeholders**: Smart comma-based line breaking
+- **Image placeholders**: Pixel (x,y) positioning parameters
+- **Admin controls**: Individual styling per placeholder instance
+- **User experience**: Single input fills multiple similar placeholders
+
+### Document Creation Flow
+1. User searches/selects template
+2. Fills form with placeholders
+3. Real-time preview generation
+4. Payment/token deduction
+5. PDF generation and download
+6. Auto-save to drafts system
+
+### Batch Processing
+- Select multiple templates
+- Consolidate duplicate inputs
+- Individual formatting preserved
+- Bulk download with proper file naming
+- Token deduction per document
+
+## Payment & Token System
+
+### Token Management
+- Admin-configurable token rates (e.g., 100 NGN = 1000 tokens)
+- Minimum/maximum purchase limits
+- Wallet system to avoid payment gateway stress
+- Auto-renewal for subscriptions
+- Flexible token purchasing for subscribers
+
+### Subscription Plans
+- **Pay-as-you-go**: Token purchases only
+- **Business**: Monthly token allocation + ability to buy extra
+- **Enterprise**: Higher monthly allocation + premium features
+- Display expiration dates and renewal options
+- Secure recurring billing with stored payment methods
+
+## Admin Dashboard Requirements
+
+### Statistics & Analytics
+- Comprehensive visit tracking (pages, duration, frequency)
+- Revenue analytics and customer metrics
+- Document creation statistics
+- User behavior analysis
+- Performance metrics with data export (CSV, PDF)
+- Real-time monitoring dashboards
+
+### Template Management
+- Upload document with immediate editing interface
+- Placeholder extraction and configuration
+- Bulk pricing updates by category/tag
+- Template categorization and tagging system
+- Preview image and extraction document separation
+- Template marketplace management
+
+### User Management
+- View, suspend, delete users
+- Role assignment (create moderators)
+- User statistics and monitoring
+- Bulk operations and filtering
+
+## Advanced Features
+
+### Document Sharing System
+- Temporary preview links with passwords
+- Time-limited access (configurable hours)
+- View-only permissions for external users
+- Comment system for feedback
+- Auto-expiring security measures
+
+### SEO & Marketing
+- Individual pages for each template
+- Meta tags and social sharing optimization
+- Google indexing for document discovery
+- Landing page search with real-time filtering
+- Responsive preview containers
+
+### Notification System
+- **Firebase Cloud Messaging** - properly configured
+- **Apple Push Notifications** - properly configured
+- Email notifications for payments, renewals, etc.
+- In-app notification system with badges
+- Admin alert system for security events
+
+## Performance Requirements
+
+### Speed Optimization
+- Document generation under 5 seconds
+- Real-time preview updates
+- Optimized database queries
+- Caching strategies implementation
+- Background task processing
+
+### User Experience Metrics
+- Display generation time to users
+- Show time saved calculations
+- Performance statistics in admin dashboard
+- System responsiveness monitoring
+
+## Security Implementation
+
+### Fraud Prevention
+- Advanced device fingerprinting
+- Cross-browser user tracking
+- IP-based restrictions
+- Automated abuse detection
+- Secure session management
+
+### Data Protection
+- Encrypted sensitive data storage
+- Secure payment processing
+- GDPR compliance measures
+- Audit trail logging
+- Secure file upload handling
+
+## Documentation Requirements
+
+After codebase improvements, consolidate to these essential docs:
+1. **README.md** - Comprehensive project documentation
+2. **API_DOCUMENTATION.md** - Complete API reference
+3. **FRONTEND_INTEGRATION.md** - React/Vite integration guide
+4. **BACKEND_DOCUMENTATION.md** - All features and tools
+5. **PAYMENT_FINANCE_DOCUMENTATION.md** - Complete payment system
+6. **DATABASE_DOCUMENTATION.md** - Full database schema and operations
+7. **SETUP_DEPLOYMENT_GUIDE.md** - Configuration and deployment
+8. **FEATURES_USAGE_DOCUMENTATION.md** - All roles and workflows
+
+## Code Quality Standards
+
+### Implementation Requirements
+- Senior-level programming standards
+- Production-ready architecture
+- Comprehensive error handling
+- Proper logging and monitoring
+- Clean, maintainable code structure
+- Full test coverage for critical paths
+
+### Performance Targets
+- Sub-second API response times
+- Efficient database operations
+- Optimized file processing
+- Scalable architecture design
+- Memory-efficient operations
+
+## Integration Requirements
+
+### Essential Services
+- PostgreSQL database optimization
+- Firebase Cloud Messaging setup
+- Apple Push Notification configuration
+- Email service integration (production-ready)
+- Payment gateway integration (Flutterwave)
+- File storage and processing systems
+
+### Monitoring & Analytics
+- Comprehensive visit tracking
+- Performance monitoring
+- Error tracking and alerting
+- User behavior analytics
+- System health monitoring
+
+## Final Notes
+
+This is an MVP for a startup company. Every feature must be:
+- Production-ready and professional
+- Scalable and maintainable
+- User-friendly and intuitive
+- Secure and compliant
+- Fast and responsive
+
+The goal is to create a platform that appears to be built by a large, professional team. No shortcuts, no placeholders, no "TODO" items - everything must be complete and functional.

@@ -1,0 +1,36 @@
+modules = ["python-3.11"]
+[agent]
+expertMode = true
+integrations = ["python_sendgrid==1.0.0"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["cargo", "file", "freetype", "lcms2", "libGL", "libGLU", "libiconv", "libimagequant", "libjpeg", "libtiff", "libuv", "libwebp", "libxcrypt", "openjpeg", "openssl", "pkg-config", "poppler_utils", "redis", "rustc", "tcl", "tesseract", "tk", "xsimd", "zlib"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "MyTypist Backend"
+
+[[workflows.workflow]]
+name = "MyTypist Backend"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
