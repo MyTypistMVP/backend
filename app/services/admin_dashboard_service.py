@@ -18,6 +18,128 @@ from app.models.payment import Payment
 logger = logging.getLogger(__name__)
 
 
+class AdminDashboardService:
+    """Service for admin dashboard analytics and management"""
+
+    @staticmethod
+    async def get_realtime_stats(db: Session) -> Dict[str, Any]:
+        """Get real-time statistics for admin dashboard"""
+        try:
+            # Active users in last 15 minutes
+            fifteen_mins_ago = datetime.utcnow() - timedelta(minutes=15)
+            active_users = db.query(PageVisit).filter(
+                PageVisit.created_at >= fifteen_mins_ago
+            ).distinct(PageVisit.user_id).count()
+
+            # Documents being created/processed now
+            processing_docs = db.query(Document).filter(
+                Document.status == "processing",
+                Document.created_at >= fifteen_mins_ago
+            ).count()
+
+            # Current revenue today
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_revenue = db.query(func.sum(Payment.amount)).filter(
+                Payment.status == "completed",
+                Payment.created_at >= today_start
+            ).scalar() or 0.0
+
+            return {
+                "active_users_now": active_users,
+                "processing_documents": processing_docs,
+                "revenue_today": today_revenue,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Failed to get realtime stats: {e}")
+            raise
+
+    @staticmethod
+    async def get_daily_summary(db: Session, date: datetime) -> Dict[str, Any]:
+        """Get or generate daily analytics summary"""
+        try:
+            # Try to get existing summary
+            summary = db.query(AnalyticsSummary).filter(
+                func.date(AnalyticsSummary.date) == date.date()
+            ).first()
+
+            if summary:
+                return json.loads(summary.top_pages) if summary.top_pages else {}
+
+            # Generate new summary
+            start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_of_day = start_of_day + timedelta(days=1)
+
+            # User metrics
+            new_users = db.query(User).filter(
+                User.created_at.between(start_of_day, end_of_day)
+            ).count()
+
+            active_users = db.query(PageVisit).filter(
+                PageVisit.created_at.between(start_of_day, end_of_day)
+            ).distinct(PageVisit.user_id).count()
+
+            # Document metrics
+            docs_created = db.query(Document).filter(
+                Document.created_at.between(start_of_day, end_of_day)
+            ).count()
+
+            # Revenue metrics
+            revenue = db.query(func.sum(Payment.amount)).filter(
+                Payment.status == "completed",
+                Payment.created_at.between(start_of_day, end_of_day)
+            ).scalar() or 0.0
+
+            # Visit metrics
+            visits = db.query(PageVisit).filter(
+                PageVisit.created_at.between(start_of_day, end_of_day)
+            ).all()
+            
+            # Create summary record
+            summary = AnalyticsSummary(
+                date=date,
+                total_users=db.query(User).count(),
+                new_users=new_users,
+                active_users=active_users,
+                documents_created=docs_created,
+                revenue_amount=revenue,
+                total_visits=len(visits),
+                unique_visitors=len(set(v.session_id for v in visits)),
+                avg_visit_duration=sum(v.visit_duration for v in visits) / len(visits) if visits else 0
+            )
+            
+            db.add(summary)
+            await db.commit()
+            await db.refresh(summary)
+            
+            return {
+                "date": date.isoformat(),
+                "metrics": {
+                    "users": {
+                        "total": summary.total_users,
+                        "new": summary.new_users,
+                        "active": summary.active_users
+                    },
+                    "documents": {
+                        "created": summary.documents_created,
+                        "downloaded": summary.documents_downloaded
+                    },
+                    "revenue": {
+                        "total": summary.revenue_amount,
+                        "currency": summary.revenue_currency
+                    },
+                    "visits": {
+                        "total": summary.total_visits,
+                        "unique": summary.unique_visitors,
+                        "avg_duration": summary.avg_visit_duration
+                    }
+                }
+            }
+        except Exception as e:
+            logger.error(f"Failed to generate daily summary: {e}")
+            raise
+
+
 class PageVisit(Base):
     """Track page visits for analytics"""
     __tablename__ = "page_visits"
@@ -37,6 +159,45 @@ class PageVisit(Base):
     browser = Column(String(100), nullable=True)
     country = Column(String(100), nullable=True)
     city = Column(String(100), nullable=True)
+
+
+class AnalyticsSummary(Base):
+    """Daily analytics summary for quick dashboard access"""
+    __tablename__ = "analytics_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(DateTime, nullable=False, index=True)
+    
+    # User metrics
+    total_users = Column(Integer, default=0)
+    new_users = Column(Integer, default=0)
+    active_users = Column(Integer, default=0)
+    
+    # Document metrics
+    documents_created = Column(Integer, default=0)
+    documents_downloaded = Column(Integer, default=0)
+    template_submissions = Column(Integer, default=0)
+    
+    # Revenue metrics
+    revenue_amount = Column(Float, default=0.0)
+    revenue_currency = Column(String(3), default="NGN")
+    subscription_revenue = Column(Float, default=0.0)
+    pay_as_you_go_revenue = Column(Float, default=0.0)
+    
+    # Visit metrics
+    total_visits = Column(Integer, default=0)
+    unique_visitors = Column(Integer, default=0)
+    avg_visit_duration = Column(Float, default=0.0)  # seconds
+    bounce_rate = Column(Float, default=0.0)  # percentage
+    
+    # Most visited pages (JSON array of {path, count})
+    top_pages = Column(Text, nullable=True)
+    
+    # Performance metrics
+    avg_response_time = Column(Float, default=0.0)  # milliseconds
+    error_count = Column(Integer, default=0)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class DocumentShare(Base):

@@ -40,6 +40,8 @@ class Template(Base):
     is_public = Column(Boolean, nullable=False, default=False)
     is_premium = Column(Boolean, nullable=False, default=False)
     price = Column(Float, nullable=False, default=0.0)  # in Naira
+    special_offer = Column(JSON, nullable=True)  # {discount_percent, start_date, end_date, original_price}
+    bulk_pricing_rules = Column(JSON, nullable=True)  # [{min_tokens, max_tokens, price_per_token}]
     
     # Analytics
     usage_count = Column(Integer, nullable=False, default=0)

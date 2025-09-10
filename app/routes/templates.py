@@ -573,3 +573,71 @@ async def get_my_template_stats(
         ))
 
     return stats
+
+@router.put("/{template_id}/price", response_model=Dict[str, Any])
+async def update_template_price(
+    template_id: int,
+    price_update: PriceUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Update price for a single template"""
+    try:
+        template = await TemplateService.update_template_price(db, template_id, price_update.new_price)
+        return {
+            "status": "success",
+            "template_id": template.id,
+            "new_price": template.price
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/price/bulk", response_model=Dict[str, Any])
+async def update_bulk_prices(
+    price_update: BulkPriceUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Update prices in bulk for templates"""
+    try:
+        updated = await TemplateService.bulk_update_prices(
+            db,
+            price_update.filter_type,
+            price_update.filter_value,
+            price_update.price_change,
+            price_update.operation
+        )
+        return {
+            "status": "success",
+            "updated_count": updated,
+            "message": f"Successfully updated {updated} template prices"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{template_id}/special-offer", response_model=Dict[str, Any])
+async def set_special_offer(
+    template_id: int,
+    offer: SpecialOffer,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Set a special offer/discount for a template"""
+    try:
+        template = await TemplateService.set_special_offer(
+            db,
+            template_id,
+            offer.discount_percent,
+            offer.start_date,
+            offer.end_date
+        )
+        return {
+            "status": "success",
+            "template_id": template.id,
+            "original_price": template.special_offer["original_price"],
+            "discounted_price": template.price,
+            "discount_percent": offer.discount_percent,
+            "offer_ends": offer.end_date.isoformat()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

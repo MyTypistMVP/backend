@@ -41,6 +41,14 @@ class TemplateService:
     ALLOWED_PREVIEW_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.pdf']
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
+    # Pricing operations
+    PRICE_OPERATIONS = {
+        'set': lambda old, new: new,
+        'increase': lambda old, new: old + new,
+        'decrease': lambda old, new: max(0, old - new),
+        'percentage': lambda old, new: old * (1 + new/100)
+    }
+
     @staticmethod
     async def create_template(db: Session, template_data: TemplateCreate,
                             template_file: UploadFile, preview_file: UploadFile, user_id: int) -> Template:
@@ -584,6 +592,102 @@ class TemplateService:
 
         finally:
             db.close()
+
+    @staticmethod
+    async def update_template_price(db: Session, template_id: int, new_price: float) -> Template:
+        """Update price for a single template"""
+        if new_price < 0:
+            raise ValueError("Price cannot be negative")
+            
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            raise ValueError(f"Template {template_id} not found")
+        
+        template.price = new_price
+        db.add(template)
+        await db.commit()
+        await db.refresh(template)
+        return template
+
+    @staticmethod
+    async def bulk_update_prices(
+        db: Session, 
+        filter_type: str, 
+        filter_value: Optional[str], 
+        price_change: float,
+        operation: str
+    ) -> int:
+        """Update prices in bulk based on filter criteria"""
+        if operation not in ["set", "increase", "decrease", "percentage"]:
+            raise ValueError("Invalid operation. Must be: set, increase, decrease, or percentage")
+
+        # Build query based on filter type
+        query = db.query(Template)
+        if filter_type == "category":
+            query = query.filter(Template.category == filter_value)
+        elif filter_type == "tag":
+            query = query.filter(Template.tags.contains([filter_value]))
+        elif filter_type == "group":
+            query = query.filter(Template.type == filter_value)
+        elif filter_type != "all":
+            raise ValueError("Invalid filter_type. Must be: 'all', 'category', 'tag', or 'group'")
+
+        # Update prices using the specified operation
+        operations = {
+            'set': lambda old, new: new,
+            'increase': lambda old, new: old + new,
+            'decrease': lambda old, new: max(0, old - new),
+            'percentage': lambda old, new: old * (1 + new/100)
+        }
+
+        updated_count = 0
+        templates = await query.all()
+        for template in templates:
+            old_price = template.price
+            new_price = operations[operation](old_price, price_change)
+            if new_price < 0:
+                new_price = 0
+            
+            if new_price != old_price:
+                template.price = new_price
+                db.add(template)
+                updated_count += 1
+
+        if updated_count > 0:
+            await db.commit()
+        
+        return updated_count
+
+    @staticmethod
+    async def set_special_offer(
+        db: Session,
+        template_id: int,
+        discount_percent: float,
+        start_date: datetime,
+        end_date: datetime
+    ) -> Template:
+        """Set a special offer/discount for a template"""
+        if not 0 <= discount_percent <= 100:
+            raise ValueError("Discount percentage must be between 0 and 100")
+        if end_date <= start_date:
+            raise ValueError("End date must be after start date")
+            
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            raise ValueError(f"Template {template_id} not found")
+            
+        template.special_offer = {
+            "discount_percent": discount_percent,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "original_price": template.price
+        }
+        template.price = template.price * (1 - discount_percent/100)
+        
+        db.add(template)
+        await db.commit()
+        await db.refresh(template)
+        return template
 
     @staticmethod
     def get_popular_templates(db: Session, limit: int = 10) -> List[Template]:

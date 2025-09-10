@@ -379,33 +379,12 @@ async def re_extract_placeholders(
 
 
 @router.get("/admin/review-queue", response_model=Dict[str, Any])
-async def get_admin_review_queue(
-    limit: int = 50,
+async def get_template_review_queue(
+    status: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get templates pending admin review"""
-    try:
-        if not current_user.is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin access required"
-            )
-
-        result = UserTemplateUploadService.get_admin_review_queue(
-            db=db,
-            limit=limit
-        )
-
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get review queue: {str(e)}"
-        )
+    """Get queue of templates pending admin review"""
 
 
 @router.post("/admin/{template_id}/approve", response_model=Dict[str, Any])

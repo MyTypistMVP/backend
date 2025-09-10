@@ -37,11 +37,37 @@ def require_admin(current_user: User = Depends(get_current_active_user)):
 
 
 @router.get("/dashboard")
-async def get_admin_dashboard(
-    admin_user: User = Depends(require_admin),
+async def admin_dashboard(
+    current_admin: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """Get comprehensive admin dashboard with all statistics"""
+    """Get admin dashboard overview with real-time metrics"""
+    try:
+        # Get real-time stats
+        realtime = await AdminDashboardService.get_realtime_stats(db)
+        
+        # Get today's summary
+        today_summary = await AdminDashboardService.get_daily_summary(db, datetime.utcnow())
+        
+        # Get weekly trend (last 7 days)
+        weekly_summaries = []
+        for i in range(7):
+            date = datetime.utcnow() - timedelta(days=i)
+            summary = await AdminDashboardService.get_daily_summary(db, date)
+            weekly_summaries.append(summary)
+            
+        return {
+            "success": True,
+            "realtime": realtime,
+            "today": today_summary,
+            "weekly_trend": weekly_summaries,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get dashboard data: {str(e)}"
+        )
     from app.services.admin_dashboard_service import AdminDashboardService
 
     dashboard_data = AdminDashboardService.get_comprehensive_dashboard_stats(db)

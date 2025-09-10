@@ -48,6 +48,24 @@ class UserUploadedTemplate(Base):
     visibility = Column(String(20), default="private")  # private, public, pending_review
     admin_approved = Column(Boolean, default=False)
     admin_review_notes = Column(Text, nullable=True)
+    
+    # Pricing and revenue
+    price_tokens = Column(Integer, default=0)  # Price in tokens
+    revenue_share_percent = Column(Float, default=70.0)  # User gets 70% by default
+    revenue_generated = Column(Float, default=0.0)  # Total revenue generated
+    revenue_paid = Column(Float, default=0.0)  # Total revenue paid to user
+    
+    # Usage metrics
+    views_count = Column(Integer, default=0)
+    downloads_count = Column(Integer, default=0)
+    last_downloaded = Column(DateTime, nullable=True)
+    rating = Column(Float, default=0.0)
+    rating_count = Column(Integer, default=0)
+    
+    # Timestamps and status
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_reviewed_at = Column(DateTime, nullable=True)
     reviewed_by = Column(Integer, ForeignKey('users.id'), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
 
