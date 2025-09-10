@@ -2,7 +2,7 @@
 
 ## Overview
 
-MyTypist Backend supports both SQLite (development) and PostgreSQL (production) with advanced optimization configurations for maximum performance. This guide covers database setup, optimization, migration, and maintenance.
+MyTypist Backend uses PostgreSQL (development and production) with advanced optimization configurations for maximum performance. This guide covers database setup, optimization, migration, and maintenance.
 
 ## Database Architecture
 
@@ -28,36 +28,6 @@ audit_logs(user_id) -> users(id)
 
 ---
 
-## SQLite Configuration (Development)
-
-### 1. Optimized SQLite Setup
-```python
-# database.py - SQLite configuration
-if "sqlite" in settings.DATABASE_URL.lower():
-    engine = create_engine(
-        settings.DATABASE_URL,
-        poolclass=StaticPool,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        connect_args={
-            "check_same_thread": False,
-            "timeout": 20,
-        },
-        echo=settings.DEBUG
-    )
-    
-    # Performance optimizations
-    @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        
-        # WAL mode for better concurrency
-        cursor.execute("PRAGMA journal_mode=WAL")
-        
-        # Increase cache size (10MB)
-        cursor.execute("PRAGMA cache_size=10000")
-        
-        # Enable foreign key constraints
         cursor.execute("PRAGMA foreign_keys=ON")
         
         # Optimize synchronous mode

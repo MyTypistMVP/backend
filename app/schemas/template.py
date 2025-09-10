@@ -198,3 +198,93 @@ class TemplateStats(BaseModel):
     revenue: float
     created_at: datetime
     last_used: Optional[datetime]
+
+
+# Template Management Schemas
+class CategoryBase(BaseModel):
+    """Base schema for template categories"""
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    parent_id: Optional[int] = None
+
+
+class CategoryCreate(CategoryBase):
+    """Schema for creating a new category"""
+    pass
+
+
+class CategoryUpdate(CategoryBase):
+    """Schema for updating a category"""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    is_active: Optional[bool] = None
+
+
+class CategoryResponse(CategoryBase):
+    """Schema for category response"""
+    id: int
+    slug: str
+    created_at: datetime
+    updated_at: datetime
+    is_active: bool
+    subcategories: Optional[List['CategoryResponse']] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TemplateVersionBase(BaseModel):
+    """Base schema for template versions"""
+    version_number: str = Field(..., pattern=r"^\d+\.\d+\.\d+$")
+    changes: List[str]
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class TemplateVersionCreate(TemplateVersionBase):
+    """Schema for creating a new template version"""
+    pass
+
+
+class TemplateVersionResponse(TemplateVersionBase):
+    """Schema for template version response"""
+    id: int
+    template_id: int
+    content_hash: str
+    template_file_path: str
+    preview_file_path: str
+    created_by: int
+    created_at: datetime
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class TemplateApproval(BaseModel):
+    """Schema for template approval/rejection"""
+    approval_status: str = Field(..., pattern=r"^(approved|rejected)$")
+    notes: Optional[str] = Field(None, max_length=1000)
+
+
+class TemplateReviewBase(BaseModel):
+    """Base schema for template reviews"""
+    rating: int = Field(..., ge=1, le=5)
+    review_text: Optional[str] = Field(None, max_length=1000)
+
+
+class TemplateReviewCreate(TemplateReviewBase):
+    """Schema for creating a new template review"""
+    pass
+
+
+class TemplateReviewResponse(TemplateReviewBase):
+    """Schema for template review response"""
+    id: int
+    template_id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+    is_active: bool
+
+    class Config:
+        from_attributes = True

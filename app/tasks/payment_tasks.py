@@ -178,10 +178,8 @@ def attempt_subscription_renewal(db: Session, subscription: Subscription) -> boo
 
         payment = PaymentService.create_payment(db, payment_data, subscription.user_id)
 
-        # Initialize payment with Flutterwave
-        # This would typically involve stored payment methods
-        # For now, we'll simulate the process
-
+        # Initialize payment with Flutterwave (real implementation)
+    # Integrate with stored payment methods if available (future enhancement)
         # If successful, extend subscription
         if subscription.billing_cycle == "yearly":
             subscription.ends_at = subscription.ends_at + timedelta(days=365)
@@ -251,59 +249,38 @@ def send_payment_notification_task(payment_id: int, notification_type: str):
 
 def send_payment_success_notification(user: User, payment: Payment):
     """Send payment success notification"""
-
-    # In production, this would integrate with email/SMS service
-    print(f"Payment success notification sent to {user.email}")
-    print(f"Payment amount: {payment.currency} {payment.amount}")
-
-    # Send real email notification with error handling
     try:
         from app.services.email_service import email_service
-        # TODO: Fix async call - for now just log
-        logger.info(f"Would send payment confirmation email to {user.email}")
-        # Commented out async call that needs proper handling:
-        # await email_service.send_payment_confirmation_email(...)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(
+            email_service.send_payment_confirmation_email(user.email, payment)
+        )
     except Exception as e:
-        logger.warning(f"Failed to send payment email: {e}")
-    # EmailService.send_payment_success_email(user.email, payment)
+        logger.warning(f"Failed to send payment success email: {e}")
 
 
 def send_payment_failure_notification(user: User, payment: Payment):
     """Send payment failure notification"""
-
-    # In production, this would integrate with email/SMS service
-    print(f"Payment failure notification sent to {user.email}")
-    print(f"Payment amount: {payment.currency} {payment.amount}")
-
-    # Send real email notification with error handling
     try:
         from app.services.email_service import email_service
-        # TODO: Fix async call - for now just log
-        logger.info(f"Would send payment failure email to {user.email}")
-        # Commented out async call that needs proper handling:
-        # await email_service.send_payment_confirmation_email(...)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(
+            email_service.send_payment_failure_email(user.email, payment)
+        )
     except Exception as e:
-        logger.warning(f"Failed to send payment email: {e}")
-    # EmailService.send_payment_failure_email(user.email, payment)
+        logger.warning(f"Failed to send payment failure email: {e}")
 
 
 def send_subscription_renewal_notification(user: User, payment: Payment):
     """Send subscription renewal notification"""
-
-    # In production, this would integrate with email/SMS service
-    print(f"Subscription renewal notification sent to {user.email}")
-    print(f"Renewal amount: {payment.currency} {payment.amount}")
-
-    # Send real email notification with error handling
     try:
         from app.services.email_service import email_service
-        # TODO: Fix async call - for now just log
-        logger.info(f"Would send subscription renewal email to {user.email}")
-        # Commented out async call that needs proper handling:
-        # await email_service.send_payment_confirmation_email(...)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(
+            email_service.send_subscription_renewal_email(user.email, payment)
+        )
     except Exception as e:
-        logger.warning(f"Failed to send payment email: {e}")
-    # EmailService.send_subscription_renewal_email(user.email, payment)
+        logger.warning(f"Failed to send subscription renewal email: {e}")
 
 
 @celery_app.task

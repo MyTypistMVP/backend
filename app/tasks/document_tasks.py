@@ -400,8 +400,34 @@ def generate_document_thumbnails_task():
 
 
 def generate_document_thumbnail(file_path: str) -> str:
-    """Generate thumbnail for document file"""
-    
-    # This would implement actual thumbnail generation
-    # For now, return placeholder
-    return f"{file_path}.thumbnail.png"
+    """Generate thumbnail for document file (DOCX, PDF, or image)"""
+    import os
+    from PIL import Image
+    try:
+        ext = os.path.splitext(file_path)[1].lower()
+        thumbnail_path = f"{file_path}.thumbnail.png"
+        if ext == ".pdf":
+            from pdf2image import convert_from_path
+            pages = convert_from_path(file_path, first_page=1, last_page=1)
+            if pages:
+                pages[0].save(thumbnail_path, "PNG")
+        elif ext in [".docx", ".doc"]:
+            from docx2pdf import convert as docx2pdf_convert
+            import tempfile
+            with tempfile.TemporaryDirectory() as tmpdir:
+                pdf_path = os.path.join(tmpdir, "temp.pdf")
+                docx2pdf_convert(file_path, pdf_path)
+                from pdf2image import convert_from_path
+                pages = convert_from_path(pdf_path, first_page=1, last_page=1)
+                if pages:
+                    pages[0].save(thumbnail_path, "PNG")
+        elif ext in [".png", ".jpg", ".jpeg"]:
+            with Image.open(file_path) as img:
+                img.thumbnail((400, 400))
+                img.save(thumbnail_path, "PNG")
+        else:
+            raise ValueError("Unsupported file type for thumbnail generation")
+        return thumbnail_path
+    except Exception as e:
+        logger.error(f"Failed to generate thumbnail for {file_path}: {e}")
+        raise

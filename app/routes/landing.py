@@ -14,7 +14,9 @@ from database import get_db
 from app.models.user import User
 from app.services.landing_page_service import LandingPageService
 from app.services.audit_service import AuditService
+from app.services.realtime_analytics_service import RealtimeAnalyticsService
 from app.utils.security import get_current_active_user, get_current_user_optional
+from app.schemas.analytics import EventType, EventData, PageViewData, TemplateInteractionData
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,24 @@ def get_session_info(request: Request) -> Dict[str, str]:
         "user_agent": request.headers.get("user-agent")
     }
 
+async def track_page_interaction(request: Request, db: Session, interaction_data: Dict[str, Any]):
+    """Helper to track page interactions in real-time"""
+    try:
+        session_info = get_session_info(request)
+        event_data = {
+            **interaction_data,
+            **session_info
+        }
+        
+        await RealtimeAnalyticsService.track_user_interaction(
+            db=db,
+            session_id=session_info["session_id"],
+            event_type=event_data.pop("event_type"),
+            event_data=event_data
+        )
+    except Exception as e:
+        logger.error(f"Failed to track real-time interaction: {e}", exc_info=True)
+
 
 @router.post("/track-visit", response_model=Dict[str, Any])
 async def track_landing_visit(
@@ -83,6 +103,19 @@ async def track_landing_visit(
             user_agent=session_info["user_agent"],
             referrer=track_request.referrer,
             utm_params=utm_params
+        )
+
+        # Track in real-time analytics
+        await track_page_interaction(
+            request=request,
+            db=db,
+            interaction_data={
+                "event_type": EventType.PAGE_VIEW,
+                "page": "landing",
+                "referrer": track_request.referrer,
+                "utm_params": utm_params,
+                "entry_point": True
+            }
         )
 
         return result
@@ -160,6 +193,17 @@ async def track_template_view(
             session_id=session_info["session_id"]
         )
 
+        # Track in real-time analytics
+        await track_page_interaction(
+            request=request,
+            db=db,
+            interaction_data={
+                "event_type": EventType.TEMPLATE_INTERACTION,
+                "template_id": template_id,
+                "action": "view"
+            }
+        )
+
         return result
 
     except Exception as e:
@@ -171,6 +215,7 @@ async def track_template_view(
 async def get_template_preview(
     template_id: int,
     request: Request,
+    interaction_time: Optional[int] = Query(None, description="Time spent viewing template in seconds"),
     db: Session = Depends(get_db)
 ):
     """Get template preview with demo data for landing page"""
@@ -178,10 +223,25 @@ async def get_template_preview(
         session_info = get_session_info(request)
 
         # Track the view
-        LandingPageService.track_template_view(
+        result = LandingPageService.track_template_view(
             db=db,
             template_id=template_id,
             session_id=session_info["session_id"]
+        )
+
+        # Track in real-time analytics with duration if provided
+        interaction_data = {
+            "event_type": EventType.TEMPLATE_INTERACTION,
+            "template_id": template_id,
+            "action": "preview"
+        }
+        if interaction_time is not None:
+            interaction_data["duration"] = interaction_time
+
+        await track_page_interaction(
+            request=request,
+            db=db,
+            interaction_data=interaction_data
         )
 
         # Get template details
@@ -594,37 +654,43 @@ async def get_conversion_funnel(
 
 # Helper function to add to LandingPageService
 def _generate_template_preview(db: Session, template, demo_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate template preview with demo data"""
+    """Generate secure template preview with demo data and watermark"""
     try:
-        # This would integrate with your existing document generation service
-        # For now, return placeholder data
+        # Get document service and cache service
+        from app.services.document_service import DocumentService
+        from app.services.cache_service import CacheService
+        from app.services.thumbnail_service import ThumbnailService
+        
+        # Try to get from cache first
+        cache_key = f"preview:{template.id}:{hash(frozenset(demo_data.items()))}"
+        cached_preview = CacheService.get(cache_key)
+        if cached_preview:
+            return cached_preview
 
-        placeholders = []
-        if hasattr(template, 'placeholders'):
-            # Extract placeholders from template
-            placeholders = [
-                {
-                    "name": "name",
-                    "type": "text",
-                    "label": "Full Name",
-                    "required": True,
-                    "demo_value": demo_data.get("name", "John Doe")
-                },
-                {
-                    "name": "email",
-                    "type": "email",
-                    "label": "Email Address",
-                    "required": True,
-                    "demo_value": demo_data.get("email", "john.doe@example.com")
-                },
-                {
-                    "name": "date",
-                    "type": "date",
-                    "label": "Date",
-                    "required": False,
-                    "demo_value": demo_data.get("date", datetime.utcnow().strftime("%B %d, %Y"))
-                }
-            ]
+        # Extract placeholders with validation and sanitization
+        placeholders = DocumentService.extract_template_placeholders(
+            template_file=template.file_path,
+            validate=True,
+            sanitize=True
+        )
+        
+        # Enhance placeholders with smart suggestions and validation
+        enhanced_placeholders = []
+        for placeholder in placeholders:
+            placeholder_data = {
+                "name": placeholder["name"],
+                "type": placeholder["type"],
+                "label": placeholder.get("label", placeholder["name"].title()),
+                "required": placeholder.get("required", True),
+                "demo_value": demo_data.get(placeholder["name"], DocumentService.get_default_value(placeholder["type"])),
+                "validation": DocumentService.get_placeholder_validation(placeholder["type"]),
+                "suggestions": DocumentService.get_placeholder_suggestions(placeholder["name"], placeholder["type"]),
+                "auto_format": True,
+                "help_text": placeholder.get("help_text"),
+                "examples": DocumentService.get_placeholder_examples(placeholder["name"], placeholder["type"]),
+                "max_length": placeholder.get("max_length"),
+                "pattern": placeholder.get("pattern"),
+            }
 
         return {
             "success": True,

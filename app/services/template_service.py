@@ -36,31 +36,59 @@ redis_client = redis.Redis(
 
 class TemplateService:
     """Template management and processing service"""
+    
+    ALLOWED_TEMPLATE_EXTENSIONS = ['.docx', '.pdf', '.txt']
+    ALLOWED_PREVIEW_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.pdf']
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
     @staticmethod
     async def create_template(db: Session, template_data: TemplateCreate,
-                            file: UploadFile, user_id: int) -> Template:
+                            template_file: UploadFile, preview_file: UploadFile, user_id: int) -> Template:
         """Create new template with file upload"""
 
-        # Generate unique filename
-        file_extension = Path(file.filename).suffix
-        unique_filename = f"{uuid.uuid4()}{file_extension}"
-        file_path = os.path.join(settings.TEMPLATES_PATH, unique_filename)
+        # Validate files
+        template_ext = Path(template_file.filename).suffix.lower()
+        preview_ext = Path(preview_file.filename).suffix.lower()
+        
+        if template_ext not in TemplateService.ALLOWED_TEMPLATE_EXTENSIONS:
+            raise ValueError(f"Invalid template file type. Allowed: {TemplateService.ALLOWED_TEMPLATE_EXTENSIONS}")
+        
+        if preview_ext not in TemplateService.ALLOWED_PREVIEW_EXTENSIONS:
+            raise ValueError(f"Invalid preview file type. Allowed: {TemplateService.ALLOWED_PREVIEW_EXTENSIONS}")
 
-        # Save uploaded file
-        with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+        # Generate unique filenames
+        template_filename = f"{uuid.uuid4()}{template_ext}"
+        preview_filename = f"{uuid.uuid4()}{preview_ext}"
+        
+        template_path = os.path.join(settings.TEMPLATES_PATH, template_filename)
+        preview_path = os.path.join(settings.PREVIEWS_PATH, preview_filename)
+
+        # Save uploaded files
+        template_content = await template_file.read()
+        preview_content = await preview_file.read()
+        
+        if len(template_content) > TemplateService.MAX_FILE_SIZE:
+            raise ValueError("Template file too large")
+        if len(preview_content) > TemplateService.MAX_FILE_SIZE:
+            raise ValueError("Preview file too large")
+            
+        os.makedirs(settings.TEMPLATES_PATH, exist_ok=True)
+        os.makedirs(settings.PREVIEWS_PATH, exist_ok=True)
+        
+        with open(template_path, "wb") as f:
+            f.write(template_content)
+        with open(preview_path, "wb") as f:
+            f.write(preview_content)
 
         # Calculate file hash and size
-        file_hash = TemplateService._calculate_file_hash(file_path)
-        file_size = os.path.getsize(file_path)
+        file_hash = TemplateService._calculate_file_hash(template_path)
+        file_size = os.path.getsize(template_path)
 
         # Extract placeholders from document
-        placeholders = TemplateService._extract_placeholders_from_file(file_path)
+        placeholders = TemplateService._extract_placeholders_from_file(template_path)
 
         # Detect document font
-        font_family, font_size = TemplateService._detect_document_font(file_path)
+        font_family, font_size = TemplateService._detect_document_font(template_path)
         if template_data.font_family == "Times New Roman":  # Default
             template_data.font_family = font_family
         if template_data.font_size == 12:  # Default
@@ -72,8 +100,9 @@ class TemplateService:
             description=template_data.description,
             category=template_data.category,
             type=template_data.type,
-            file_path=unique_filename,
-            original_filename=file.filename,
+            file_path=template_filename,
+            preview_image_url=preview_filename,
+            original_filename=template_file.filename,
             file_size=file_size,
             file_hash=file_hash,
             placeholders=json.dumps([p.__dict__ for p in placeholders]),
@@ -85,7 +114,12 @@ class TemplateService:
             price=template_data.price,
             tags=template_data.tags,
             keywords=template_data.keywords,
-            created_by=user_id
+            created_by=user_id,
+            current_version="1.0.0",
+            first_version="1.0.0",
+            latest_version="1.0.0",
+            total_versions=1,
+            approval_status='pending'
         )
 
         db.add(template)

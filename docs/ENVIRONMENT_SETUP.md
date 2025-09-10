@@ -8,7 +8,7 @@ MyTypist Backend requires specific environment configuration for optimal perform
 
 ### Development Environment
 - **Purpose**: Local development and testing
-- **Database**: SQLite with WAL mode or local PostgreSQL
+- **Database**: PostgreSQL only
 - **Cache**: Local Redis or in-memory caching
 - **Security**: Relaxed CORS, detailed error messages
 - **Performance**: Development-optimized with debugging enabled
@@ -54,8 +54,6 @@ DB_MAX_OVERFLOW=30
 DB_POOL_TIMEOUT=30
 DB_POOL_RECYCLE=3600
 
-# SQLite (Development)
-DATABASE_URL=sqlite:///./storage/mytypist.db
 ```
 
 ### Redis Configuration
@@ -173,7 +171,7 @@ DEBUG=true
 SECRET_KEY=dev-secret-key-not-for-production
 
 # Local Database
-DATABASE_URL=sqlite:///./storage/mytypist_dev.db
+DATABASE_URL=postgresql://dev_user:dev_password@localhost:5432/mytypist_dev
 
 # Local Redis
 REDIS_URL=redis://localhost:6379/0
