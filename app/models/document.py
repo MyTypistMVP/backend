@@ -17,6 +17,7 @@ class DocumentStatus(str, enum.Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     ARCHIVED = "archived"
+    GUEST = "guest"  # Added guest status for anonymous documents
 
 
 class DocumentAccess(str, enum.Enum):

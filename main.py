@@ -18,13 +18,14 @@ from config import settings
 from database import engine, SessionLocal
 from app.models import user, template, document, signature, visit, payment, audit
 from app.services.feedback_service import Feedback  # Import feedback model
-from app.routes import auth, documents, templates, signatures, analytics, payments, admin, monitoring, feedback, referrals
+from app.routes import auth, documents, templates, signatures, analytics, payments, admin, monitoring, feedback, referrals, anonymous
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.security import SecurityMiddleware
 from app.middleware.audit import AuditMiddleware
 from app.middleware.performance import PerformanceMiddleware, CompressionMiddleware
 from app.middleware.advanced_security import RequestValidationMiddleware
 from app.middleware.csrf_protection import CSRFProtectionMiddleware
+from app.middleware.guest_session import GuestSessionMiddleware
 from app.services.audit_service import AuditService
 from app.services.cache_service import cache_service
 # Enterprise services removed for MVP
@@ -170,6 +171,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Guest session middleware for anonymous users
+app.add_middleware(GuestSessionMiddleware)
+
 # Trusted host middleware
 app.add_middleware(
     TrustedHostMiddleware,
@@ -291,6 +295,9 @@ app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 
 # Include referral system
 app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
+
+# Include anonymous routes
+app.include_router(anonymous.router, prefix="/api/anonymous", tags=["Anonymous"])
 
 # Include admin rewards system
 from app.routes import admin_rewards

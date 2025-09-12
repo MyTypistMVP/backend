@@ -24,12 +24,20 @@ class DocumentBase(BaseModel):
         return v
 
 
+class DocumentCustomization(BaseModel):
+    """Document customization options"""
+    font: Optional[str] = Field(None, pattern=r"^[A-Za-z ]+$")
+    size: Optional[int] = Field(None, ge=8, le=14)
+    replacements: Optional[Dict[str, str]] = {}
+
+
 class DocumentCreate(DocumentBase):
     """Document creation schema"""
     template_id: Optional[int] = None
     placeholder_data: Optional[Dict[str, Any]] = {}
     content: Optional[str] = None
     file_format: str = Field("docx", pattern=r"^(docx|pdf)$")
+    customization: Optional[DocumentCustomization] = None
 
 
 class DocumentUpdate(BaseModel):

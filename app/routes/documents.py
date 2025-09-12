@@ -37,9 +37,19 @@ async def create_document(
     background_tasks: BackgroundTasks,
     request: Request,
     current_user: User = Depends(get_current_active_user),
+    guest_session: str = None,
     db: Session = Depends(get_db)
 ):
-    """Create a new document"""
+    """Create a new document for authenticated users or guests"""
+    
+    # Check if this is a guest request
+    if not current_user:
+        guest_session = request.cookies.get("guest_session_id")
+        if not guest_session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication or guest session required"
+            )
 
     # Validate template if provided
     template = None
@@ -62,7 +72,29 @@ async def create_document(
             )
 
     # Create document
-    document = DocumentService.create_document(db, document_data, current_user.id)
+    if current_user:
+        user_id = current_user.id
+        doc_status = DocumentStatus.DRAFT
+    else:
+        user_id = None  # Will be updated when user registers
+        doc_status = DocumentStatus.GUEST
+
+    # Create document with appropriate status
+    document = Document(
+        title=document_data.title,
+        description=document_data.description,
+        template_id=template.id if template else None,
+        content=document_data.content,
+        user_id=user_id,
+        status=doc_status,
+        access_level=document_data.access_level,
+        requires_signature=document_data.requires_signature,
+        required_signature_count=document_data.required_signature_count,
+        auto_delete=document_data.auto_delete,
+        file_format=document_data.file_format
+    )
+    db.add(document)
+    db.flush()
 
     # Start background generation if template is provided
     if template and document_data.placeholder_data:
@@ -72,17 +104,27 @@ async def create_document(
             document_data.placeholder_data
         )
         document.status = DocumentStatus.PROCESSING
-        db.commit()
+    
+    # If guest, store session ID in metadata for later
+    if not current_user and guest_session:
+        document.metadata = {
+            "guest_session_id": guest_session,
+            "created_at": datetime.utcnow().isoformat()
+        }
+    
+    db.commit()
 
     # Log document creation
+    event_user = current_user.id if current_user else f"guest:{guest_session}"
     AuditService.log_document_event(
         "DOCUMENT_CREATED",
-        current_user.id,
+        event_user,
         request,
         {
             "document_id": document.id,
             "template_id": document_data.template_id,
-            "title": document.title
+            "title": document.title,
+            "is_guest": not current_user
         }
     )
 
@@ -736,6 +778,67 @@ async def preview_document(
 
     preview = DocumentService.generate_preview(document)
     return preview
+
+
+@router.get("/{document_id}/download")
+async def download_document(
+    document_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Download a document with guest restrictions"""
+    
+    # Get the document
+    document = db.query(Document).filter(
+        Document.id == document_id
+    ).first()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    # Check access rights
+    if document.status == DocumentStatus.GUEST:
+        # Guest documents can only be downloaded by registering
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please register to download this document"
+        )
+    
+    # For regular documents, check ownership
+    elif document.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    # Update download stats
+    document.download_count += 1
+    if not document.is_downloaded:
+        document.is_downloaded = True
+    db.commit()
+    
+    # Log download event
+    AuditService.log_document_event(
+        "DOCUMENT_DOWNLOADED",
+        current_user.id,
+        request,
+        {
+            "document_id": document.id,
+            "title": document.title,
+            "download_count": document.download_count
+        }
+    )
+    
+    # Return file response
+    return FileResponse(
+        document.file_path,
+        filename=f"{document.title}.{document.file_format}",
+        media_type="application/octet-stream"
+    )
 
 
 @router.get("/shared/{share_token}")

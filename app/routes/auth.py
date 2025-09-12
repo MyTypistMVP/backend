@@ -14,6 +14,7 @@ import logging
 from database import get_db
 from config import settings
 from app.models.user import User, UserRole, UserStatus
+from app.models.document import Document, DocumentStatus
 from app.schemas.user import (
     UserCreate, UserLogin, UserResponse, TokenResponse,
     UserPasswordChange, PasswordResetRequest, PasswordReset,
@@ -35,7 +36,10 @@ async def register(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """User registration with basic validation"""
+    """User registration with guest document conversion"""
+
+    # Get guest session if exists
+    guest_session = request.cookies.get("guest_session_id")
 
     # Check if user already exists
     existing_user = db.query(User).filter(
@@ -68,6 +72,26 @@ async def register(
     # Create user
     user = AuthService.create_user(db, user_data, request)
 
+    # Transfer guest documents if guest session exists
+    if guest_session:
+        # Find all guest documents for this session
+        guest_docs = db.query(Document).filter(
+            Document.status == DocumentStatus.GUEST,
+            Document.metadata.contains({"guest_session_id": guest_session})
+        ).all()
+        
+        # Transfer ownership and update status
+        for doc in guest_docs:
+            doc.user_id = user.id
+            doc.status = DocumentStatus.DRAFT
+            # Keep metadata for tracking but update status
+            doc.metadata = {
+                **doc.metadata,
+                "converted_to_user": user.id,
+                "converted_at": datetime.utcnow().isoformat()
+            }
+        db.commit()
+
     # Generate tokens
     access_token = AuthService.create_access_token({"sub": str(user.id)})
     refresh_token = AuthService.create_refresh_token({"sub": str(user.id)})
@@ -87,22 +111,42 @@ async def register(
     except Exception as e:
         logger.error(f"Failed to send welcome email: {e}")
 
-    # Log successful registration
+    # Log successful registration with guest conversion
     try:
+        audit_data = {
+            "email": user.email,
+            "role": user.role.value
+        }
+        if guest_session:
+            audit_data["guest_session"] = guest_session
+            audit_data["converted_documents"] = len(guest_docs) if guest_docs else 0
+            
         AuditService.log_auth_event(
             "user_registered",
             user.id,
             request,
-            {"email": user.email, "role": user.role.value}
+            audit_data
         )
     except Exception as e:
         print(f"Audit logging failed: {e}")
 
-    return TokenResponse(
+    response = TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         expires_in=settings.JWT_ACCESS_TOKEN_EXPIRE_HOURS * 3600,
         user=UserResponse.from_orm(user)
+    )
+    
+    # Clear guest session cookie after successful conversion
+    if guest_session:
+        response.set_cookie(
+            "guest_session_id",
+            "",
+            max_age=0,
+            httponly=True
+        )
+        
+    return response
     )
 
 

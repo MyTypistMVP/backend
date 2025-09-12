@@ -15,6 +15,7 @@ from app.models.document import Document
 from app.models.user import User
 from app.services.analytics_service import AnalyticsService
 from app.services.audit_service import AuditService
+from app.services.performance_service import PerformanceService
 from app.utils.security import get_current_active_user
 
 router = APIRouter()
@@ -44,6 +45,85 @@ async def track_visit(
     return {
         "message": "Visit tracked successfully",
         "visit_id": visit.id
+    }
+
+
+@router.get("/performance/time-saved")
+async def get_time_savings(
+    time_period: TimePeriod = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get time savings analytics for the current user"""
+    metrics = PerformanceService.get_user_time_savings(
+        db,
+        current_user.id,
+        time_period.start_date if time_period else None,
+        time_period.end_date if time_period else None
+    )
+    return metrics
+
+
+@router.get("/performance/batch/{batch_id}")
+async def get_batch_analytics(
+    batch_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get analytics for a batch processing job"""
+    # Verify batch belongs to user
+    document = db.query(Document).filter(
+        Document.batch_id == batch_id,
+        Document.user_id == current_user.id
+    ).first()
+    
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Batch not found"
+        )
+    
+    analytics = PerformanceService.get_batch_analytics(db, batch_id)
+    return analytics
+
+
+@router.get("/performance/dashboard")
+async def get_performance_dashboard(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get performance dashboard data"""
+    # Get last 30 days metrics
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    
+    time_saved = PerformanceService.get_user_time_savings(
+        db,
+        current_user.id,
+        thirty_days_ago
+    )
+    
+    # Get recent batches
+    recent_batches = db.query(Document.batch_id).filter(
+        Document.user_id == current_user.id,
+        Document.batch_id.isnot(None),
+        Document.created_at >= thirty_days_ago
+    ).distinct().limit(5).all()
+    
+    batch_analytics = [
+        PerformanceService.get_batch_analytics(db, batch_id)
+        for (batch_id,) in recent_batches
+        if batch_id
+    ]
+    
+    return {
+        "time_saved": time_saved,
+        "recent_batches": batch_analytics,
+        "total_documents": db.query(Document).filter(
+            Document.user_id == current_user.id,
+            Document.created_at >= thirty_days_ago
+        ).count(),
+        "period_start": thirty_days_ago,
+        "period_end": datetime.utcnow()
     }
 
 

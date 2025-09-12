@@ -20,7 +20,8 @@ class Template(Base):
     type = Column(String(50), nullable=False)  # letter, affidavit, contract, etc.
     
     # File information
-    file_path = Column(String(500), nullable=False)
+    file_path = Column(String(500), nullable=False)  # Extraction version
+    preview_file_path = Column(String(500), nullable=True)  # Preview version
     original_filename = Column(String(255), nullable=False)
     file_size = Column(Integer, nullable=False)  # bytes
     file_hash = Column(String(64), nullable=False)  # SHA256 hash
@@ -39,6 +40,7 @@ class Template(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     is_public = Column(Boolean, nullable=False, default=False)
     is_premium = Column(Boolean, nullable=False, default=False)
+    token_cost = Column(Integer, nullable=False, default=1)  # Number of tokens needed
     price = Column(Float, nullable=False, default=0.0)  # in Naira
     special_offer = Column(JSON, nullable=True)  # {discount_percent, start_date, end_date, original_price}
     bulk_pricing_rules = Column(JSON, nullable=True)  # [{min_tokens, max_tokens, price_per_token}]
@@ -48,6 +50,15 @@ class Template(Base):
     download_count = Column(Integer, nullable=False, default=0)
     rating = Column(Float, nullable=False, default=0.0)
     rating_count = Column(Integer, nullable=False, default=0)
+    
+    # Preview metrics
+    preview_count = Column(Integer, nullable=False, default=0)
+    preview_to_download_rate = Column(Float, nullable=False, default=0.0)
+    average_generation_time = Column(Float, nullable=True)  # in seconds
+    
+    # Time tracking
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     
     # SEO and discoverability
     tags = Column(JSON, nullable=True)  # JSON array of tags

@@ -35,19 +35,141 @@ redis_client = redis.Redis(
 
 
 class TemplateService:
-    """
-Template management and processing service
-Handles all template-related operations including creation, updates, versioning, and marketplace features
-"""
+    """Template management and processing service"""
 
-import os
-import uuid
-import hashlib
-import json
-import re
-import logging
-from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
+    @staticmethod
+    async def create_template(
+        db: Session,
+        template_data: TemplateCreate,
+        file: UploadFile,
+        user_id: int,
+        preview_file: Optional[UploadFile] = None
+    ) -> Template:
+        """Create new template with files"""
+        try:
+            # Generate unique filename
+            file_ext = os.path.splitext(file.filename)[1]
+            unique_filename = f"{uuid.uuid4()}{file_ext}"
+            
+            # Process main extraction file
+            file_path = await process_extraction_file(file, unique_filename)
+            file_size = os.path.getsize(file_path)
+            file_hash = hashlib.sha256(await file.read()).hexdigest()
+            
+            # Process preview file if provided, otherwise generate from main file
+            preview_file_path = None
+            if preview_file:
+                preview_filename = f"preview_{unique_filename}"
+                preview_file_path = await process_preview_file(preview_file, preview_filename)
+            else:
+                preview_filename = f"preview_{unique_filename}"
+                preview_file_path = await process_preview_file(file, preview_filename)
+
+            # Create template record
+            template = Template(
+                name=template_data.name,
+                description=template_data.description,
+                category=template_data.category,
+                type=template_data.type,
+                language=template_data.language,
+                font_family=template_data.font_family,
+                font_size=template_data.font_size,
+                file_path=file_path,
+                preview_file_path=preview_file_path,
+                original_filename=file.filename,
+                file_size=file_size,
+                file_hash=file_hash,
+                is_public=template_data.is_public,
+                is_premium=template_data.is_premium,
+                token_cost=1,  # Default token cost, can be updated later
+                price=template_data.price
+            )
+
+            db.add(template)
+            db.commit()
+            db.refresh(template)
+
+            return template
+
+        )
+
+        except Exception as e:
+            # Cleanup any created files on error
+            if 'file_path' in locals() and os.path.exists(file_path):
+                os.remove(file_path)
+            if 'preview_file_path' in locals() and os.path.exists(preview_file_path):
+                os.remove(preview_file_path)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create template: {str(e)}"
+            )
+
+    @staticmethod
+    async def get_template_preview(
+        db: Session,
+        template_id: int,
+        user_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Get template preview details with analytics tracking"""
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+
+        # Increment preview count
+        template.preview_count += 1
+        
+        # Update preview to download rate
+        if template.download_count > 0:
+            template.preview_to_download_rate = (
+                template.download_count / template.preview_count
+            )
+
+        db.commit()
+
+        return {
+            "id": template.id,
+            "name": template.name,
+            "description": template.description,
+            "category": template.category,
+            "type": template.type,
+            "preview_path": template.preview_file_path,
+            "is_premium": template.is_premium,
+            "token_cost": template.token_cost,
+            "rating": template.rating,
+            "rating_count": template.rating_count,
+            "download_count": template.download_count,
+            "average_generation_time": template.average_generation_time
+        }
+
+    @staticmethod
+    async def update_template_metrics(
+        db: Session,
+        template_id: int,
+        generation_time: Optional[float] = None,
+        downloaded: bool = False
+    ) -> None:
+        """Update template metrics"""
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            return
+
+        if generation_time:
+            # Update average generation time
+            if template.average_generation_time:
+                template.average_generation_time = (
+                    template.average_generation_time + generation_time
+                ) / 2
+            else:
+                template.average_generation_time = generation_time
+
+        if downloaded:
+            template.download_count += 1
+            template.preview_to_download_rate = (
+                template.download_count / template.preview_count
+                if template.preview_count > 0 else 0
+            )
+
+        db.commit()
 from pathlib import Path
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
