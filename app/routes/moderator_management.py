@@ -16,7 +16,7 @@ from app.services.audit_service import AuditService
 from app.utils.security import get_current_active_user, require_admin
 from app.utils.password import get_password_hash
 
-router = APIRouter(prefix="/api/v1/moderators", tags=["moderators"])
+router = APIRouter(prefix="/api/moderators", tags=["moderators"])
 
 
 class ModeratorCreateRequest(BaseModel):

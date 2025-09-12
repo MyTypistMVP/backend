@@ -14,13 +14,13 @@ from app.services.production_monitoring import production_monitor
 from app.utils.security import get_current_user
 from app.models.user import User
 
-router = APIRouter(prefix="/monitoring", tags=["monitoring"])
+router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
 
 
 @router.get("/health")
 async def basic_health_check():
     """Basic health check endpoint"""
-    return {"status": "healthy", "service": "MyTypist Backend", "version": "1.0.0"}
+    return {"status": "healthy", "service": "MyTypist Backend"}
 
 
 @router.get("/health/detailed")

@@ -2,8 +2,17 @@
 Enhanced Notification Service
 Comprehensive notification system for security alerts, user activities, and system events
 """
+class NotificationPreferences(Base):
+    """User notification preferences"""
+    __tablename__ = "notification_preferences"
 
-from datetime import datetime, timedelta
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+
+    # Channel preferences
+    email_enabled = Column(Boolean, nullable=False, default=True)
+    in_app_enabled = Column(Boolean, nullable=False, default=True)
+    sms_enabled = Column(Boolean, nullable=False, default=False)me import datetime, timedelta
 from typing import Dict, List, Optional, Set
 from sqlalchemy.orm import Session
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, JSON, func, desc, and_
@@ -55,7 +64,6 @@ class NotificationChannel(str, Enum):
     IN_APP = "in_app"
     EMAIL = "email"
     SMS = "sms"
-    PUSH = "push"
     WEBHOOK = "webhook"
 
 
@@ -367,10 +375,6 @@ class EnhancedNotificationService:
 
                 elif channel == NotificationChannel.SMS and preferences.sms_enabled:
                     result = await EnhancedNotificationService._send_sms(notification, user)
-                    delivery_results[channel] = result
-
-                elif channel == NotificationChannel.PUSH and preferences.push_enabled:
-                    result = await EnhancedNotificationService._send_push(notification, user)
                     delivery_results[channel] = result
 
             except Exception as e:

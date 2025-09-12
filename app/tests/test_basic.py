@@ -26,13 +26,10 @@ def test_settings_configuration():
 
     # Test basic settings
     assert hasattr(settings, 'APP_NAME')
-    assert hasattr(settings, 'APP_VERSION')
     assert hasattr(settings, 'DATABASE_URL')
 
     # Test that required settings are not empty
     assert settings.APP_NAME == "MyTypist"
-    assert settings.APP_VERSION is not None
-    assert len(settings.APP_VERSION) > 0
 
 
 def test_database_manager_exists():

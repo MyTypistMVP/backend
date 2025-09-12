@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from app.models.user import User
 from app.utils.security import get_current_active_user
-from app.services.template_marketplace_service import TemplateMarketplaceService
+from app.services.template_service import TemplateService
 from app.services.audit_service import AuditService
 
 router = APIRouter()

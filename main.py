@@ -23,36 +23,46 @@ from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.security import SecurityMiddleware
 from app.middleware.audit import AuditMiddleware
 from app.middleware.performance import PerformanceMiddleware, CompressionMiddleware
-from app.middleware.advanced_security import AdvancedSecurityMiddleware, RequestValidationMiddleware
+from app.middleware.advanced_security import RequestValidationMiddleware
 from app.middleware.csrf_protection import CSRFProtectionMiddleware
 from app.services.audit_service import AuditService
 from app.services.cache_service import cache_service
 # Enterprise services removed for MVP
 
 
-# Skip database table creation for now to get the server running
-# TODO: Fix table creation process later
-print("⚠️ Skipping database table creation to optimize startup time")
-print("ℹ️  Database tables should be created via migration scripts")
-
-# Enterprise security tables removed for MVP
-
-# Skip new service tables for now to get basic app running
-print("⚠️ Skipping advanced service tables to resolve startup issues")
+if settings.SKIP_DB_TABLE_CREATION:
+    # Skip database table creation for now to get the server running (controlled via env)
+    print("⚠️ SKIP_DB_TABLE_CREATION is true — skipping database table creation")
+    print("ℹ️  Database tables should be created via migration scripts (alembic)")
+    print("⚠️ Skipping advanced service tables to resolve startup issues")
 
 # Initialize Redis (optional)
-try:
-    redis_client = redis.Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        password=settings.REDIS_PASSWORD,
-        decode_responses=True,
-        socket_connect_timeout=5
-    )
-    # Test connection
-    redis_client.ping()
-except Exception:
-    # Use a mock Redis client for development
+if settings.REDIS_ENABLED:
+    try:
+        redis_client = redis.Redis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            password=settings.REDIS_PASSWORD,
+            decode_responses=True,
+            socket_connect_timeout=5
+        )
+        # Test connection
+        redis_client.ping()
+    except Exception as e:
+        print(f"⚠️ Redis connection failed: {e}")
+        # Fall back to a mock for local development when explicitly enabled but failing
+        class MockRedis:
+            def ping(self): return True
+            def get(self, key): return None
+            def set(self, key, value, ex=None): return True
+            def setex(self, key, time, value): return True
+            def delete(self, key): return True
+            def incr(self, key): return 1
+            def expire(self, key, time): return True
+
+        redis_client = MockRedis()
+else:
+    # Use a mock Redis client for development when Redis is disabled
     class MockRedis:
         def ping(self): return True
         def get(self, key): return None
@@ -118,7 +128,7 @@ async def lifespan(app: FastAPI):
 
     # Initialize audit service
     try:
-        AuditService.log_system_event(audit.AuditEventType.SYSTEM_STARTUP.value, {"version": settings.APP_VERSION})
+        AuditService.log_system_event(audit.AuditEventType.SYSTEM_STARTUP.value, {"service": settings.APP_NAME})
     except Exception as e:
         print(f"⚠️ Audit service failed to start: {e}")
 
@@ -138,7 +148,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="MyTypist API",
     description="High-performance document automation platform for Nigerian businesses",
-    version=settings.APP_VERSION,
     docs_url="/api/docs" if settings.DEBUG else None,
     redoc_url="/api/redoc" if settings.DEBUG else None,
     lifespan=lifespan
@@ -147,10 +156,10 @@ app = FastAPI(
 # Performance and security middleware (order matters!)
 app.add_middleware(CompressionMiddleware, minimum_size=1024, compression_level=6)
 app.add_middleware(PerformanceMiddleware, slow_request_threshold=1.0)
-app.add_middleware(AdvancedSecurityMiddleware)
+# Use consolidated security middleware
+app.add_middleware(SecurityMiddleware)
 app.add_middleware(RequestValidationMiddleware)
 app.add_middleware(CSRFProtectionMiddleware)
-app.add_middleware(SecurityMiddleware)
 app.add_middleware(AuditMiddleware)
 app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
 
@@ -233,7 +242,6 @@ async def health_check():
     health_status = {
         "status": "healthy",
         "timestamp": time.time(),
-        "version": settings.APP_VERSION,
         "services": {}
     }
 
@@ -265,7 +273,6 @@ async def root():
     return {
         "message": "Welcome to MyTypist API",
         "description": "High-performance document automation platform for Nigerian businesses",
-        "version": settings.APP_VERSION,
         "status": "running",
         "documentation": "/api/docs",
         "health_check": "/health"

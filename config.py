@@ -12,7 +12,6 @@ class Settings(BaseSettings):
 
     # Application
     APP_NAME: str = "MyTypist"
-    APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-this")
 
@@ -68,7 +67,7 @@ class Settings(BaseSettings):
     # Flutterwave
     FLUTTERWAVE_PUBLIC_KEY: str = os.getenv("FLUTTERWAVE_PUBLIC_KEY", "")
     FLUTTERWAVE_SECRET_KEY: str = os.getenv("FLUTTERWAVE_SECRET_KEY", "")
-    FLUTTERWAVE_BASE_URL: str = "https://api.flutterwave.com/v3"
+    FLUTTERWAVE_BASE_URL: str = "https://api.flutterwave.com/api"
     FLUTTERWAVE_WEBHOOK_SECRET: str = os.getenv("FLUTTERWAVE_WEBHOOK_SECRET", "")
 
     # Email Settings - SendGrid Integration
@@ -102,6 +101,10 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "30"))
     DB_POOL_TIMEOUT: int = int(os.getenv("DB_POOL_TIMEOUT", "30"))
     DB_POOL_RECYCLE: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))
+
+    # Control dev shortcuts
+    # When True the app will skip any automatic DB table creation at startup.
+    SKIP_DB_TABLE_CREATION: bool = os.getenv("SKIP_DB_TABLE_CREATION", "false").lower() == "true"
 
     # Compliance
     GDPR_ENABLED: bool = True

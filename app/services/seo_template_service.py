@@ -135,7 +135,7 @@ class SEOTemplateService:
             ).count()
 
             # Get average rating
-            from app.services.template_marketplace_service import TemplateReview
+            from app.models.template import TemplateReview
             avg_rating = db.query(
                 db.func.avg(TemplateReview.rating)
             ).filter(TemplateReview.template_id == template_id).scalar() or 0

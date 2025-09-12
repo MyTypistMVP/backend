@@ -39,7 +39,7 @@ class FlutterwaveError(Exception):
 class PaymentService:
     """Payment and subscription management service"""
     
-    FLUTTERWAVE_BASE_URL = "https://api.flutterwave.com/v3"
+    FLUTTERWAVE_BASE_URL = "https://api.flutterwave.com/api"
     
     @staticmethod
     def create_payment(db: Session, payment_data: PaymentCreate, user_id: int) -> Payment:

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app.models.user import User
 from app.models.template_management import Template, TemplateVersion, TemplateCategory
-from app.services.template_management_service import TemplateManagementService
+from app.services.template_service import TemplateService
 from app.dependencies import get_db, get_current_admin_user
 from app.schemas.template import (
     TemplateCreate,
@@ -25,7 +25,7 @@ from app.schemas.template import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/api/v1/admin/templates",
+    prefix="/api/admin/templates",
     tags=["admin", "templates"],
     dependencies=[Depends(get_current_admin_user)]
 )

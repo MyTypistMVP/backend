@@ -183,7 +183,7 @@ class AdvancedSearchService:
         # Get user's purchased templates (if logged in)
         purchased_template_ids = set()
         if user_id:
-            from app.services.template_marketplace_service import TemplatePurchase
+            from app.models.template import Template
             purchases = db.query(TemplatePurchase.template_id).filter(
                 TemplatePurchase.user_id == user_id,
                 TemplatePurchase.is_active == True

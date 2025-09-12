@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from app.models.user import User
 from app.utils.security import get_current_active_user
-from app.services.advanced_search_service import AdvancedSearchService
+from app.services.search_service import SearchService
 
 router = APIRouter()
 
@@ -33,7 +33,7 @@ async def search_templates(
 ):
     """Advanced template search with full-text search and ranking"""
 
-    search_results = AdvancedSearchService.search_templates(
+    search_results = SearchService.search_templates(
         db, query, current_user.id, category, min_price, max_price,
         rating, language, tags, sort_by, page, per_page
     )
@@ -56,7 +56,7 @@ async def search_documents(
 ):
     """Advanced document search for user's documents"""
 
-    search_results = AdvancedSearchService.search_documents(
+    search_results = SearchService.search_documents(
         db, current_user.id, query, status, template_id,
         start_date, end_date, sort_by, page, per_page
     )
@@ -72,7 +72,7 @@ async def get_search_recommendations(
 ):
     """Get personalized search recommendations"""
 
-    recommendations = AdvancedSearchService.get_search_recommendations(db, current_user.id, limit)
+    recommendations = SearchService.get_search_recommendations(db, current_user.id, limit)
     return recommendations
 
 
@@ -84,7 +84,7 @@ async def get_search_analytics(
 ):
     """Get search analytics for the user"""
 
-    analytics = AdvancedSearchService.get_search_analytics(db, current_user.id, days)
+    analytics = SearchService.get_search_analytics(db, current_user.id, days)
     return analytics
 
 
@@ -103,5 +103,5 @@ async def get_global_search_analytics(
             detail="Admin access required for search analytics"
         )
 
-    analytics = AdvancedSearchService.get_search_analytics(db, None, days)
+    analytics = SearchService.get_search_analytics(db, None, days)
     return analytics

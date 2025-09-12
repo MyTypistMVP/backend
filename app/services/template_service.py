@@ -35,7 +35,629 @@ redis_client = redis.Redis(
 
 
 class TemplateService:
+    """
+Template management and processing service
+Handles all template-related operations including creation, updates, versioning, and marketplace features
+"""
+
+import os
+import uuid
+import hashlib
+import json
+import re
+import logging
+from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple
+from pathlib import Path
+from fastapi import UploadFile, HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import desc, and_, or_, func
+from docx import Document as DocxDocument
+import redis
+
+from config import settings
+from app.models.template import (
+    Template, 
+    TemplateVersion,
+    TemplateCategory,
+    TemplateReview,
+    Placeholder
+)
+from app.models.user import User
+from app.schemas.template import (
+    TemplateCreate,
+    TemplateUpdate,
+    TemplateSearch,
+    TemplatePreview,
+    TemplateUpload,
+    TemplateRating,
+    TemplateStats,
+    PlaceholderCreate
+)
+from app.utils.storage import StorageService
+from app.utils.security import validate_file_security
+from app.utils.validation import validate_template_metadata
+from app.services.audit_service import AuditService
+from database import get_db
+
+# Redis client for caching
+redis_client = redis.Redis(
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    decode_responses=True
+)
+
+logger = logging.getLogger(__name__)
+
+class TemplateService:
     """Template management and processing service"""
+    
+    ALLOWED_TEMPLATE_EXTENSIONS = ['.docx', '.pdf', '.txt']
+    ALLOWED_PREVIEW_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.pdf']
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+    # Pricing operations
+    PRICE_OPERATIONS = {
+        'set': lambda old, new: new,
+        'increase': lambda old, new: old + new,
+        'decrease': lambda old, new: max(0, old - new),
+        'percentage': lambda old, new: old * (1 + new/100)
+    }
+
+    @staticmethod
+    async def create_template(
+        db: Session,
+        user_id: int,
+        title: str,
+        description: str,
+        template_file: UploadFile,
+        preview_file: UploadFile,
+        categories: List[int],
+        metadata: Dict[str, Any],
+        is_public: bool = True
+    ) -> Template:
+        """Create a new template with initial version"""
+        try:
+            # Validate files
+            await TemplateService._validate_template_files(template_file, preview_file)
+            
+            # Create template record
+            template = Template(
+                title=title,
+                slug=TemplateService._generate_slug(title),
+                description=description,
+                created_by=user_id,
+                is_public=is_public,
+                metadata=metadata,
+                approval_status='pending'
+            )
+            
+            # Add categories
+            template.categories = (
+                db.query(TemplateCategory)
+                .filter(TemplateCategory.id.in_(categories))
+                .all()
+            )
+            
+            db.add(template)
+            db.flush()  # Get template ID
+            
+            # Store files
+            template_path = await StorageService.store_template_file(
+                template_file, 
+                f"templates/{template.id}/{template_file.filename}"
+            )
+            preview_path = await StorageService.store_preview_file(
+                preview_file,
+                f"previews/{template.id}/{preview_file.filename}"
+            )
+            
+            # Create initial version
+            version = TemplateVersion(
+                template_id=template.id,
+                version_number="1.0.0",
+                content_hash=await TemplateService._calculate_file_hash(template_file),
+                template_file_path=template_path,
+                preview_file_path=preview_path,
+                created_by=user_id,
+                changes=["Initial version"],
+                metadata=metadata
+            )
+            
+            # Update template with version info
+            template.current_version = "1.0.0"
+            template.first_version = "1.0.0"
+            template.latest_version = "1.0.0"
+            template.preview_image_url = preview_path
+            template.template_file_url = template_path
+            
+            db.add(version)
+            db.commit()
+            
+            # Audit log
+            await AuditService.log_action(
+                db,
+                user_id=user_id,
+                action="template_created",
+                resource_type="template",
+                resource_id=template.id
+            )
+            
+            return template
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to create template: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create template: {str(e)}"
+            )
+
+    @staticmethod
+    async def update_template(
+        db: Session,
+        template_id: int,
+        user_id: int,
+        update_data: Dict[str, Any],
+        template_file: Optional[UploadFile] = None,
+        preview_file: Optional[UploadFile] = None
+    ) -> Template:
+        """Update template and create new version if files changed"""
+        try:
+            template = db.query(Template).filter(Template.id == template_id).first()
+            if not template:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Template not found"
+                )
+            
+            # Check permissions
+            if not await TemplateService._can_edit_template(db, user_id, template):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to edit template"
+                )
+            
+            # Update basic info
+            for key, value in update_data.items():
+                if hasattr(template, key):
+                    setattr(template, key, value)
+            
+            # Handle file updates
+            if template_file or preview_file:
+                await TemplateService._create_new_version(
+                    db, template, user_id, template_file, preview_file, update_data.get("changes", [])
+                )
+            
+            template.updated_at = datetime.utcnow()
+            db.commit()
+            
+            # Audit log
+            await AuditService.log_action(
+                db,
+                user_id=user_id,
+                action="template_updated",
+                resource_type="template",
+                resource_id=template.id
+            )
+            
+            return template
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to update template: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to update template: {str(e)}"
+            )
+
+    @staticmethod
+    async def approve_template(
+        db: Session,
+        template_id: int,
+        admin_id: int,
+        approval_status: str,
+        notes: Optional[str] = None
+    ) -> Template:
+        """Approve or reject a template"""
+        try:
+            template = db.query(Template).filter(Template.id == template_id).first()
+            if not template:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Template not found"
+                )
+            
+            # Verify admin permissions
+            admin = db.query(User).filter(User.id == admin_id).first()
+            if not admin or not admin.is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to approve templates"
+                )
+            
+            template.approval_status = approval_status
+            template.approval_notes = notes
+            template.approved_by = admin_id
+            template.is_approved = (approval_status == 'approved')
+            
+            db.commit()
+            
+            # Audit log
+            await AuditService.log_action(
+                db,
+                user_id=admin_id,
+                action=f"template_{approval_status}",
+                resource_type="template",
+                resource_id=template.id,
+                metadata={"notes": notes}
+            )
+            
+            return template
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to approve template: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to approve template: {str(e)}"
+            )
+
+    @staticmethod
+    async def get_template_versions(
+        db: Session,
+        template_id: int,
+        limit: int = 10,
+        offset: int = 0
+    ) -> List[TemplateVersion]:
+        """Get version history for a template"""
+        try:
+            versions = (
+                db.query(TemplateVersion)
+                .filter(TemplateVersion.template_id == template_id)
+                .order_by(desc(TemplateVersion.created_at))
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+            return versions
+            
+        except Exception as e:
+            logger.error(f"Failed to get template versions: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get template versions"
+            )
+
+    @staticmethod
+    async def search_templates(
+        db: Session,
+        search_params: TemplateSearch,
+        user_id: Optional[int] = None
+    ) -> Tuple[List[Template], int]:
+        """Search templates with advanced filters"""
+        try:
+            query = db.query(Template)
+
+            # Apply search filters
+            if search_params.query:
+                search = f"%{search_params.query}%"
+                query = query.filter(
+                    or_(
+                        Template.title.ilike(search),
+                        Template.description.ilike(search),
+                        Template.tags.contains(search)
+                    )
+                )
+
+            if search_params.categories:
+                query = query.filter(Template.categories.any(TemplateCategory.id.in_(search_params.categories)))
+
+            if search_params.is_public is not None:
+                query = query.filter(Template.is_public == search_params.is_public)
+
+            if search_params.is_premium is not None:
+                query = query.filter(Template.is_premium == search_params.is_premium)
+
+            # Get total count before pagination
+            total = query.count()
+
+            # Apply sorting
+            if search_params.sort_by:
+                if search_params.sort_by == "popular":
+                    query = query.order_by(desc(Template.usage_count))
+                elif search_params.sort_by == "newest":
+                    query = query.order_by(desc(Template.created_at))
+                elif search_params.sort_by == "name":
+                    query = query.order_by(Template.title)
+
+            # Apply pagination
+            query = query.offset(search_params.offset).limit(search_params.limit)
+
+            return query.all(), total
+
+        except Exception as e:
+            logger.error(f"Template search failed: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to search templates"
+            )
+
+    @staticmethod
+    async def get_template_analytics(
+        db: Session,
+        template_id: int
+    ) -> Dict[str, Any]:
+        """Get analytics for a template"""
+        try:
+            template = db.query(Template).filter(Template.id == template_id).first()
+            if not template:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Template not found"
+                )
+
+            # Get usage statistics
+            daily_usage = (
+                db.query(
+                    func.date(Template.created_at).label('date'),
+                    func.count().label('count')
+                )
+                .filter(Template.id == template_id)
+                .group_by(func.date(Template.created_at))
+                .order_by(func.date(Template.created_at))
+                .all()
+            )
+
+            return {
+                "total_usage": template.usage_count,
+                "total_downloads": template.download_count,
+                "rating": template.rating,
+                "rating_count": template.rating_count,
+                "daily_usage": [
+                    {
+                        "date": str(usage.date),
+                        "count": usage.count
+                    }
+                    for usage in daily_usage
+                ]
+            }
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get template analytics: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get template analytics"
+            )
+
+    # Marketplace features
+    @staticmethod
+    async def update_template_price(
+        db: Session,
+        template_id: int,
+        new_price: float
+    ) -> Template:
+        """Update price for a single template"""
+        try:
+            template = db.query(Template).filter(Template.id == template_id).first()
+            if not template:
+                raise HTTPException(status_code=404, detail="Template not found")
+
+            template.price = new_price
+            db.commit()
+
+            return template
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @staticmethod
+    async def bulk_update_prices(
+        db: Session, 
+        filter_type: str, 
+        filter_value: Optional[str], 
+        price_change: float,
+        operation: str
+    ) -> int:
+        """Update prices in bulk based on filter criteria"""
+        if operation not in TemplateService.PRICE_OPERATIONS:
+            raise ValueError("Invalid operation")
+
+        # Build query based on filter type
+        query = db.query(Template)
+        if filter_type == "category":
+            query = query.filter(Template.category == filter_value)
+        elif filter_type == "tag":
+            query = query.filter(Template.tags.contains([filter_value]))
+        elif filter_type == "group":
+            query = query.filter(Template.type == filter_value)
+        elif filter_type != "all":
+            raise ValueError("Invalid filter_type")
+
+        operation_func = TemplateService.PRICE_OPERATIONS[operation]
+        updated = 0
+
+        try:
+            for template in query.all():
+                template.price = operation_func(template.price, price_change)
+                updated += 1
+            db.commit()
+            return updated
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @staticmethod
+    async def set_special_offer(
+        db: Session,
+        template_id: int,
+        discount_percent: float,
+        start_date: datetime,
+        end_date: datetime
+    ) -> Template:
+        """Set a special offer/discount for a template"""
+        try:
+            template = db.query(Template).filter(Template.id == template_id).first()
+            if not template:
+                raise HTTPException(status_code=404, detail="Template not found")
+
+            template.special_offer = {
+                "discount_percent": discount_percent,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "original_price": template.price
+            }
+            template.price = template.price * (1 - discount_percent/100)
+            
+            db.commit()
+            return template
+
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Private helper methods
+    @staticmethod
+    async def _create_new_version(
+        db: Session,
+        template: Template,
+        user_id: int,
+        template_file: Optional[UploadFile],
+        preview_file: Optional[UploadFile],
+        changes: List[str]
+    ) -> TemplateVersion:
+        """Create a new version of a template"""
+        try:
+            # Validate files if provided
+            if template_file and preview_file:
+                await TemplateService._validate_template_files(template_file, preview_file)
+            
+            # Generate new version number
+            current_version = template.latest_version
+            new_version = TemplateService._increment_version(current_version)
+            
+            # Store new files
+            template_path = None
+            preview_path = None
+            content_hash = None
+            
+            if template_file:
+                template_path = await StorageService.store_template_file(
+                    template_file,
+                    f"templates/{template.id}/{new_version}/{template_file.filename}"
+                )
+                content_hash = await TemplateService._calculate_file_hash(template_file)
+            
+            if preview_file:
+                preview_path = await StorageService.store_preview_file(
+                    preview_file,
+                    f"previews/{template.id}/{new_version}/{preview_file.filename}"
+                )
+            
+            # Create version record
+            version = TemplateVersion(
+                template_id=template.id,
+                version_number=new_version,
+                content_hash=content_hash or template.versions[-1].content_hash,
+                template_file_path=template_path or template.template_file_url,
+                preview_file_path=preview_path or template.preview_image_url,
+                created_by=user_id,
+                changes=changes,
+                metadata=template.metadata
+            )
+            
+            # Update template
+            template.current_version = new_version
+            template.latest_version = new_version
+            template.total_versions += 1
+            if template_path:
+                template.template_file_url = template_path
+            if preview_path:
+                template.preview_image_url = preview_path
+            
+            db.add(version)
+            return version
+            
+        except Exception as e:
+            logger.error(f"Failed to create new version: {str(e)}", exc_info=True)
+            raise
+
+    @staticmethod
+    async def _validate_template_files(
+        template_file: UploadFile,
+        preview_file: UploadFile
+    ) -> None:
+        """Validate template and preview files"""
+        # Check extensions
+        template_ext = os.path.splitext(template_file.filename)[1].lower()
+        preview_ext = os.path.splitext(preview_file.filename)[1].lower()
+        
+        if template_ext not in TemplateService.ALLOWED_TEMPLATE_EXTENSIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid template file type. Allowed: {TemplateService.ALLOWED_TEMPLATE_EXTENSIONS}"
+            )
+        
+        if preview_ext not in TemplateService.ALLOWED_PREVIEW_EXTENSIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid preview file type. Allowed: {TemplateService.ALLOWED_PREVIEW_EXTENSIONS}"
+            )
+        
+        # Check file sizes
+        template_size = len(await template_file.read())
+        preview_size = len(await preview_file.read())
+        
+        await template_file.seek(0)
+        await preview_file.seek(0)
+        
+        if template_size > TemplateService.MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Template file too large"
+            )
+        
+        if preview_size > TemplateService.MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Preview file too large"
+            )
+        
+        # Security scan
+        await validate_file_security(template_file)
+        await validate_file_security(preview_file)
+
+    @staticmethod
+    async def _can_edit_template(db: Session, user_id: int, template: Template) -> bool:
+        """Check if user can edit template"""
+        user = db.query(User).filter(User.id == user_id).first()
+        return user and (user.is_admin or template.created_by == user_id)
+
+    @staticmethod
+    def _generate_slug(title: str) -> str:
+        """Generate URL-friendly slug from title"""
+        return "-".join(title.lower().split())
+
+    @staticmethod
+    def _increment_version(version: str) -> str:
+        """Increment semantic version number"""
+        major, minor, patch = map(int, version.split("."))
+        return f"{major}.{minor}.{patch + 1}"
+
+    @staticmethod
+    async def _calculate_file_hash(file: UploadFile) -> str:
+        """Calculate SHA-256 hash of file contents"""
+        hasher = hashlib.sha256()
+        content = await file.read()
+        hasher.update(content)
+        await file.seek(0)
+        return hasher.hexdigest()
     
     ALLOWED_TEMPLATE_EXTENSIONS = ['.docx', '.pdf', '.txt']
     ALLOWED_PREVIEW_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.pdf']

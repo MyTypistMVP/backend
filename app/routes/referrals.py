@@ -1,10 +1,11 @@
 """Referral system API routes"""
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.auth_service import AuthService
 from app.services.referral_service import ReferralService
+from app.middleware.rate_limit import rate_limit
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -65,12 +66,14 @@ async def create_program(
 
 
 @router.post("/create-link")
+@rate_limit(max_requests=5, window_seconds=3600)  # 5 requests per hour
 async def create_referral_link(
     request: ReferralLinkCreate,
+    req: Request,
     db: Session = Depends(get_db),
     current_user = Depends(AuthService.get_current_user)
 ):
-    """Create a new referral link"""
+    """Create a new referral link with rate limiting"""
     result = ReferralService.create_referral_link(
         db=db,
         user_id=current_user.id,

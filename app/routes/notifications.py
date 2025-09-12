@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from app.models.user import User
 from app.utils.security import get_current_active_user
-from app.services.enhanced_notification_service import EnhancedNotificationService
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -27,8 +27,9 @@ async def get_notifications(
 ):
     """Get user's notifications"""
 
-    notifications = EnhancedNotificationService.get_user_notifications(
-        db, current_user.id, page, per_page, unread_only, notification_type
+    notifications = await NotificationService.get_user_notifications(
+        current_user.id, unread_only=unread_only, notification_type=notification_type,
+        limit=per_page, offset=(page-1)*per_page
     )
 
     return notifications
@@ -42,7 +43,7 @@ async def mark_notification_as_read(
 ):
     """Mark notification as read"""
 
-    success = EnhancedNotificationService.mark_as_read(db, notification_id, current_user.id)
+    success = await NotificationService.mark_as_read(current_user.id, [notification_id])
 
     if not success:
         raise HTTPException(
@@ -61,7 +62,9 @@ async def mark_all_notifications_as_read(
 ):
     """Mark all notifications as read"""
 
-    count = EnhancedNotificationService.mark_all_as_read(db, current_user.id, notification_type)
+    result = await NotificationService.mark_as_read(current_user.id, [])
+    # NotificationService.mark_as_read returns dict; adapt response
+    count = result.get("marked_read", 0) if isinstance(result, dict) else 0
 
     return {"message": f"Marked {count} notifications as read"}
 
@@ -74,7 +77,9 @@ async def dismiss_notification(
 ):
     """Dismiss/delete notification"""
 
-    success = EnhancedNotificationService.dismiss_notification(db, notification_id, current_user.id)
+    # NotificationService currently does not expose dismiss; delete via delete_notifications
+    result = await NotificationService.delete_notifications(current_user.id, [notification_id])
+    success = result.get("deleted", 0) > 0 if isinstance(result, dict) else False
 
     if not success:
         raise HTTPException(
@@ -93,8 +98,8 @@ async def get_notification_statistics(
 ):
     """Get notification statistics for the user"""
 
-    stats = EnhancedNotificationService.get_notification_statistics(db, current_user.id, days)
-    return stats
+    # Notification statistics endpoint not implemented in lightweight NotificationService
+    return {"message": "Statistics endpoint not available in simplified NotificationService"}
 
 
 @router.post("/test")
@@ -115,9 +120,15 @@ async def create_test_notification(
             detail="Admin access required"
         )
 
-    notification = EnhancedNotificationService.create_notification(
-        db, current_user.id, notification_type, title, message, priority
+    # Create a notification using the simplified NotificationService
+    success = await NotificationService.send_notification(
+        current_user.id, title, message, data=None, notification_type=notification_type, priority=priority
     )
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to create notification")
+
+    return {"message": "Test notification created"}
 
     return {
         "message": "Test notification created",

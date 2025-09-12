@@ -14,7 +14,7 @@ from app.services.rbac_service import RBACService
 from app.services.audit_service import AuditService
 from app.utils.security import get_current_active_user, require_admin
 
-router = APIRouter(prefix="/api/v1", tags=["roles"])
+router = APIRouter(prefix="/api/roles", tags=["roles"])
 
 
 @router.get("/roles")

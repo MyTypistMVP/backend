@@ -65,7 +65,8 @@ class ReferralService:
         db: Session,
         referral_code: str,
         new_user_id: int,
-        referral_data: Optional[Dict[str, Any]] = None
+        referral_data: Optional[Dict[str, Any]] = None,
+        ip_address: Optional[str] = None
     ) -> Dict[str, Any]:
         """Process a referral when a new user signs up"""
         try:
@@ -131,12 +132,34 @@ class ReferralService:
                 reference_type="referral_welcome"
             )
 
+            # Validate that referee has made a purchase or created a document
+            has_valid_activity = await UserActivityService.validate_user_activity(
+                db=db,
+                user_id=new_user_id,
+                activity_types=["token_purchase", "document_creation"]
+            )
+            
+            if not has_valid_activity:
+                return {
+                    "success": False,
+                    "message": "Referee must purchase tokens or create a document to complete referral"
+                }
+
             if referrer_success and referee_success:
                 # Update tracking and program stats
                 tracking.status = "completed"
                 tracking.completion_date = datetime.utcnow()
                 tracking.referrer_reward = referrer_reward
                 tracking.referee_reward = referee_reward
+                tracking.referee_ip = ip_address
+
+                # Check for suspicious activity
+                is_suspicious = await FraudDetectionService.check_referral(
+                    db=db,
+                    tracking=tracking,
+                    program=program
+                )
+                tracking.is_suspicious = is_suspicious
                 
                 program.total_referrals += 1
                 program.total_rewards_given += (referrer_reward + referee_reward)
@@ -173,7 +196,8 @@ class ReferralService:
         user_id: int,
         program_code: str,
         source: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        ip_address: Optional[str] = None
     ) -> Dict[str, Any]:
         """Create a new referral link for a user"""
         try:
@@ -224,7 +248,8 @@ class ReferralService:
                 referrer_id=user_id,
                 referral_code=referral_code,
                 source=source,
-                metadata=metadata
+                metadata=metadata,
+                referrer_ip=ip_address
             )
 
             db.add(tracking)

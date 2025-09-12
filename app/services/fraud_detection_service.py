@@ -1,3 +1,12 @@
+"""Shim module to provide canonical `FraudDetectionService` name.
+
+This keeps the legacy `advanced_` implementation while exposing a
+simpler import path for routes and services.
+"""
+
+from app.services.advanced_fraud_detection_service import AdvancedFraudDetectionService as FraudDetectionService
+
+__all__ = ["FraudDetectionService"]
 """
 Advanced Fraud Detection Service
 Real-time fraud detection for payments, registrations, and suspicious activities

@@ -13,7 +13,7 @@ from app.middleware.security import SecurityHeaders
 from app.schemas.analytics import EventData
 
 router = APIRouter(
-    prefix="/api/v1/analytics/realtime",
+    prefix="/api/analytics/realtime",
     tags=["analytics"],
     dependencies=[Depends(SecurityHeaders)]
 )

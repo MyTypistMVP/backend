@@ -14,7 +14,7 @@ from database import get_db
 from app.models.document import Document
 from app.models.visit import Visit
 
-router = APIRouter(prefix="/document-sharing", tags=["document-sharing"])
+router = APIRouter(prefix="/api/document-sharing", tags=["document-sharing"])
 
 
 @router.get("/document/{document_id}", response_model=Dict[str, Any])

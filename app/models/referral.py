@@ -73,11 +73,14 @@ class ReferralTracking(Base):
     sign_up_date = Column(DateTime, nullable=True)  # When referee created account
     completion_date = Column(DateTime, nullable=True)  # When reward was given
     
-    # Analytics data
+    # Analytics and Security data
     source = Column(String(100), nullable=True)  # Where referral link was shared
     utm_source = Column(String(100), nullable=True)
     utm_medium = Column(String(100), nullable=True)
     utm_campaign = Column(String(100), nullable=True)
+    referrer_ip = Column(String(45), nullable=True)  # IPv6 support
+    referee_ip = Column(String(45), nullable=True)
+    is_suspicious = Column(Boolean, default=False)  # Flag for potential fraud
     
     # Rewards
     referrer_reward = Column(Integer, nullable=True)  # Actual tokens given to referrer

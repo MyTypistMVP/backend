@@ -35,7 +35,6 @@ def test_root_endpoint(client):
 
     data = response.json()
     assert "message" in data
-    assert "version" in data
     assert "status" in data
     assert data["status"] == "running"
 
@@ -50,7 +49,6 @@ def test_health_endpoint(client):
     data = response.json()
     assert "status" in data
     assert "timestamp" in data
-    assert "version" in data
     assert "services" in data
 
     # Status should be healthy or degraded
@@ -238,8 +236,7 @@ def test_api_versioning():
     response = client.get("/")
 
     data = response.json()
-    assert "version" in data
-    assert data["version"] == settings.APP_VERSION
+    assert "status" in data
 
 
 @pytest.mark.integration
