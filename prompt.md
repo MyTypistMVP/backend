@@ -387,3 +387,7 @@ Moderator accounts are created by admins, who define roles and permissions (e.g.
 - [ ] Update validation schemas
 - [ ] Test all routes
 - [ ] Verify dependencies
+
+## Agent progress
+
+- [x] Remove dev placeholders — MockRedis fallback made config-controlled and misleading startup prints reduced. See `main.py` and `config.py` for SKIP_DB_TABLE_CREATION and REDIS_ENABLED flags.

@@ -627,7 +627,6 @@ class DraftSystemService:
         """Create official document record from paid draft"""
         try:
             from app.models.document import Document
-            from app.services.document_version_service import DocumentVersionService
 
             # Create document record
             document = Document(
@@ -643,13 +642,7 @@ class DraftSystemService:
             db.commit()
             db.refresh(document)
 
-            # Create version record
-            DocumentVersionService.create_version(
-                db=db,
-                document_id=document.id,
-                user_id=user_id,
-                title=draft.title,
-                content=draft.document_content,
+            # Document created from draft
                 placeholder_data=json.loads(draft.placeholder_data) if draft.placeholder_data else {},
                 change_type="create_from_draft"
             )

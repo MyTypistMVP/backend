@@ -582,9 +582,31 @@ class DocumentService:
         if document.file_path and os.path.exists(document.file_path):
             try:
                 from app.services.thumbnail_service import thumbnail_service
-                # Use synchronous thumbnail generation for preview
-                thumbnail_result = {"success": False, "thumbnail_url": None}
-                # TODO: Implement sync thumbnail generation or skip for now
+
+                # Decide whether to generate thumbnails synchronously based on configuration.
+                if getattr(settings, 'ENABLE_SYNC_THUMBNAILS', False):
+                    try:
+                        # thumbnail_service.generate_thumbnail is async; run it safely
+                        # If we are in an async context this will work; otherwise, fallback to not blocking
+                        import asyncio
+
+                        if asyncio.get_event_loop().is_running():
+                            thumbnail_result = asyncio.get_event_loop().create_task(
+                                thumbnail_service.generate_thumbnail(document.id, document.file_path, document.file_format)
+                            )
+                            # We won't await here to avoid blocking; set a placeholder and let background worker fill cache
+                            thumbnail_result = {"success": False, "thumbnail_url": None}
+                        else:
+                            # Synchronous runner for environments where event loop is not running
+                            thumbnail_result = asyncio.run(
+                                thumbnail_service.generate_thumbnail(document.id, document.file_path, document.file_format)
+                            )
+                    except Exception:
+                        # If thumbnail generation fails, continue with placeholder
+                        thumbnail_result = {"success": False, "thumbnail_url": None}
+                else:
+                    # Sync thumbnails disabled — leave placeholder to be generated asynchronously
+                    thumbnail_result = {"success": False, "thumbnail_url": None}
             except ImportError:
                 thumbnail_result = {"success": False, "thumbnail_url": None}
 

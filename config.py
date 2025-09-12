@@ -64,6 +64,11 @@ class Settings(BaseSettings):
         "image/jpeg"
     ]
 
+    # Thumbnails
+    THUMBNAILS_PATH: str = os.getenv("THUMBNAILS_PATH", os.path.join(STORAGE_PATH, "thumbnails"))
+    # When True, attempt to generate thumbnails synchronously for previews (may be skipped in async environments).
+    ENABLE_SYNC_THUMBNAILS: bool = os.getenv("ENABLE_SYNC_THUMBNAILS", "false").lower() == "true"
+
     # Flutterwave
     FLUTTERWAVE_PUBLIC_KEY: str = os.getenv("FLUTTERWAVE_PUBLIC_KEY", "")
     FLUTTERWAVE_SECRET_KEY: str = os.getenv("FLUTTERWAVE_SECRET_KEY", "")

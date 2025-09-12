@@ -31,10 +31,8 @@ from app.services.cache_service import cache_service
 
 
 if settings.SKIP_DB_TABLE_CREATION:
-    # Skip database table creation for now to get the server running (controlled via env)
-    print("⚠️ SKIP_DB_TABLE_CREATION is true — skipping database table creation")
-    print("ℹ️  Database tables should be created via migration scripts (alembic)")
-    print("⚠️ Skipping advanced service tables to resolve startup issues")
+    # Skip database table creation when explicitly requested; migrations should be used in normal workflows
+    print("⚠️ SKIP_DB_TABLE_CREATION enabled — automatic table creation is disabled. Use Alembic migrations to manage schema changes.")
 
 # Initialize Redis (optional)
 if settings.REDIS_ENABLED:
@@ -306,12 +304,8 @@ try:
 except ImportError as e:
     print(f"⚠️  Push notification system not available: {e}")
 
-# Core authentication and document processing features loaded
-print("✅ Production-ready authentication system loaded")
-print("✅ Core document processing features integrated")
-
-# Skip advanced service endpoints for now to get basic app running
-print("⚠️ Skipping advanced service endpoints to focus on core functionality")
+# Core authentication and document processing features loaded (routers registered)
+print("ℹ️ Routers registered for authentication and document processing. Verify feature readiness with tests and documentation.")
 
 
 if __name__ == "__main__":
