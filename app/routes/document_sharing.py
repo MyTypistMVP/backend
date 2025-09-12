@@ -1,122 +1,107 @@
 """
-Document Sharing Routes
-Time-limited preview links with password protection and view tracking
+Public Document Sharing Routes
+Share documents with anyone, SEO friendly and track views
+No authentication required, optimized for conversions
 """
 
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
+from datetime import datetime
 
 from database import get_db
-from app.models.user import User
-from app.services.admin_dashboard_service import AdminDashboardService
-from app.services.audit_service import AuditService
-from app.utils.security import get_current_active_user
+from app.models.document import Document
+from app.models.visit import Visit
 
-router = APIRouter()
+router = APIRouter(prefix="/document-sharing", tags=["document-sharing"])
 
 
-class DocumentShareRequest(BaseModel):
-    """Request model for creating document share"""
-    document_id: int
-    hours_valid: int = 5
-    max_views: Optional[int] = None
-
-    @validator('hours_valid')
-    def validate_hours(cls, v):
-        if v < 1 or v > 168:  # Max 1 week
-            raise ValueError('Hours valid must be between 1 and 168 (1 week)')
-        return v
-
-    @validator('max_views')
-    def validate_max_views(cls, v):
-        if v is not None and (v < 1 or v > 1000):
-            raise ValueError('Max views must be between 1 and 1000')
-        return v
-
-
-class DocumentShareAccessRequest(BaseModel):
-    """Request model for accessing shared document"""
-    password: str
-
-
-@router.post("/create", response_model=Dict[str, Any])
-async def create_document_share(
-    share_request: DocumentShareRequest,
-    current_user: User = Depends(get_current_active_user),
+@router.get("/document/{document_id}", response_model=Dict[str, Any])
+async def get_shared_document(
+    document_id: int,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
-    Create a time-limited shareable link for document preview
-    Users can share their documents with others for review/feedback
+    Public endpoint to view a shared document
+    - No authentication required
+    - Tracks views for analytics
+    - Returns original document for previously downloaded documents
+    - Returns watermarked preview for public templates
     """
     try:
-        # Verify user owns the document or has permission
-        from app.models.document import Document
-        document = db.query(Document).filter(
-            Document.id == share_request.document_id
-        ).first()
-
+        document = db.query(Document).filter(Document.id == document_id).first()
+        
         if not document:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Document not found"
             )
 
-        # Check ownership or admin permission
-        if document.user_id != current_user.id and not current_user.is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You don't have permission to share this document"
-            )
-
-        # Create the share
-        result = AdminDashboardService.create_document_share(
-            db=db,
-            document_id=share_request.document_id,
-            shared_by=current_user.id,
-            hours_valid=share_request.hours_valid,
-            max_views=share_request.max_views
+        # Track the visit
+        visit = Visit(
+            document_id=document.id,
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent"),
+            referrer=request.headers.get("referer"),
+            visited_at=datetime.utcnow()
         )
+        db.add(visit)
+        db.commit()
 
-        # Log the sharing activity
-        AuditService.log_user_activity(
-            db,
-            current_user.id,
-            "DOCUMENT_SHARED",
-            {
-                "document_id": share_request.document_id,
-                "share_token": result["share_token"],
-                "hours_valid": share_request.hours_valid,
-                "max_views": share_request.max_views
-            }
-        )
-
-        return result
+        # Return document based on its status
+        return {
+            "document_id": document.id,
+            "title": document.title,
+            "content": document.content,
+            "created_at": document.created_at,
+            "watermark": not document.is_downloaded,  # Only add watermark for non-downloaded docs
+            "type": "downloaded" if document.is_downloaded else "template"
+        }
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create document share: {str(e)}"
+            detail=f"Failed to retrieve shared document: {str(e)}"
         )
 
 
-@router.get("/shared/{share_token}", response_model=Dict[str, Any])
-async def get_shared_document_info(
-    share_token: str,
+@router.get("/analytics/{document_id}", response_model=Dict[str, Any])
+async def get_document_analytics(
+    document_id: int,
     db: Session = Depends(get_db)
 ):
     """
-    Get information about a shared document (without accessing it)
-    Shows expiration time, view limits, etc.
+    Get analytics for a shared document
+    - Total views
+    - Unique visitors
+    - Traffic sources
     """
     try:
-        from app.services.admin_dashboard_service import DocumentShare
+        visits = db.query(Visit).filter(Visit.document_id == document_id).all()
+        
+        # Calculate analytics
+        unique_ips = set(visit.ip_address for visit in visits)
+        traffic_sources = {}
+        for visit in visits:
+            source = visit.referrer or "direct"
+            traffic_sources[source] = traffic_sources.get(source, 0) + 1
 
-        share = db.query(DocumentShare).filter(
+        return {
+            "total_views": len(visits),
+            "unique_visitors": len(unique_ips),
+            "traffic_sources": traffic_sources,
+            "last_viewed": max(visit.visited_at for visit in visits) if visits else None
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve analytics: {str(e)}"
+        )
             DocumentShare.share_token == share_token,
             DocumentShare.is_active == True
         ).first()
