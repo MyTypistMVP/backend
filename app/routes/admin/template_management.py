@@ -10,14 +10,13 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.models.user import User
-from app.models.template_management import Template, TemplateVersion, TemplateCategory
+from app.models.template_management import Template, TemplateCategory
 from app.services.template_service import TemplateService
 from app.dependencies import get_db, get_current_admin_user
 from app.schemas.template import (
     TemplateCreate,
     TemplateUpdate,
     TemplateResponse,
-    TemplateVersionResponse,
     CategoryCreate,
     CategoryResponse
 )
@@ -129,25 +128,7 @@ async def approve_template(
             detail=str(e)
         )
 
-@router.get("/{template_id}/versions", response_model=List[TemplateVersionResponse])
-async def get_template_versions(
-    template_id: int,
-    limit: int = 10,
-    offset: int = 0,
-    db: Session = Depends(get_db)
-):
-    """Get version history for a template"""
-    try:
-        versions = await TemplateManagementService.get_template_versions(
-            db=db,
-            template_id=template_id,
-            limit=limit,
-            offset=offset
-        )
-        return versions
-    except Exception as e:
-        logger.error(f"Failed to get template versions: {str(e)}", exc_info=True)
-        raise HTTPException(
+
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )

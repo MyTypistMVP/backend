@@ -9,14 +9,19 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """Application settings"""
-
+    
     # Application
     APP_NAME: str = "MyTypist"
     DEBUG: bool = True
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-this")
 
+    # PostgreSQL settings
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "mytypist")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "mytypist123")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "mytypistdb")
+
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/mytypisdb")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://mytypist:mytypist123@localhost:5433/mytypistdb")
 
     # Redis (optional for caching and rate limiting)
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")

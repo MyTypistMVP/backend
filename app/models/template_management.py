@@ -34,9 +34,7 @@ class TemplateCategory(Base):
     parent = relationship("TemplateCategory", remote_side=[id], backref="subcategories")
     templates = relationship("Template", secondary=template_categories, back_populates="categories")
 
-class TemplateVersion(Base):
-    """Version history for templates"""
-    __tablename__ = 'template_versions'
+
 
     id = Column(Integer, primary_key=True, index=True)
     template_id = Column(Integer, ForeignKey('templates.id'), nullable=False)

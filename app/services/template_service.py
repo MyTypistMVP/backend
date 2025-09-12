@@ -91,8 +91,6 @@ class TemplateService:
 
             return template
 
-        )
-
         except Exception as e:
             # Cleanup any created files on error
             if 'file_path' in locals() and os.path.exists(file_path):
@@ -178,13 +176,9 @@ from docx import Document as DocxDocument
 import redis
 
 from config import settings
-from app.models.template import (
-    Template, 
-    TemplateVersion,
-    TemplateCategory,
-    TemplateReview,
-    Placeholder
-)
+from app.models.template import Template, Placeholder
+from app.models.template_management import TemplateCategory
+from app.models.review import TemplateReview
 from app.models.user import User
 from app.schemas.template import (
     TemplateCreate,
@@ -238,7 +232,7 @@ class TemplateService:
         metadata: Dict[str, Any],
         is_public: bool = True
     ) -> Template:
-        """Create a new template with initial version"""
+        """Create a new template"""
         try:
             # Validate files
             await TemplateService._validate_template_files(template_file, preview_file)
@@ -267,33 +261,17 @@ class TemplateService:
             # Store files
             template_path = await StorageService.store_template_file(
                 template_file, 
-                f"templates/{template.id}/{template_file.filename}"
+                os.path.join("templates", str(template.id), template_file.filename)
             )
             preview_path = await StorageService.store_preview_file(
                 preview_file,
-                f"previews/{template.id}/{preview_file.filename}"
+                os.path.join("previews", str(template.id), preview_file.filename)
             )
             
-            # Create initial version
-            version = TemplateVersion(
-                template_id=template.id,
-                version_number="1.0.0",
-                content_hash=await TemplateService._calculate_file_hash(template_file),
-                template_file_path=template_path,
-                preview_file_path=preview_path,
-                created_by=user_id,
-                changes=["Initial version"],
-                metadata=metadata
-            )
-            
-            # Update template with version info
-            template.current_version = "1.0.0"
-            template.first_version = "1.0.0"
-            template.latest_version = "1.0.0"
+            # Update template with file paths
             template.preview_image_url = preview_path
             template.template_file_url = template_path
             
-            db.add(version)
             db.commit()
             
             # Audit log
@@ -324,7 +302,7 @@ class TemplateService:
         template_file: Optional[UploadFile] = None,
         preview_file: Optional[UploadFile] = None
     ) -> Template:
-        """Update template and create new version if files changed"""
+        """Update template data and files"""
         try:
             template = db.query(Template).filter(Template.id == template_id).first()
             if not template:
@@ -347,9 +325,20 @@ class TemplateService:
             
             # Handle file updates
             if template_file or preview_file:
-                await TemplateService._create_new_version(
-                    db, template, user_id, template_file, preview_file, update_data.get("changes", [])
-                )
+                # Store new files
+                if template_file:
+                    template_path = await StorageService.store_template_file(
+                        template_file,
+                        f"templates/{template.id}/{template_file.filename}"
+                    )
+                    template.template_file_url = template_path
+                
+                if preview_file:
+                    preview_path = await StorageService.store_preview_file(
+                        preview_file,
+                        f"previews/{template.id}/{preview_file.filename}"
+                    )
+                    template.preview_image_url = preview_path
             
             template.updated_at = datetime.utcnow()
             db.commit()
@@ -429,31 +418,7 @@ class TemplateService:
                 detail=f"Failed to approve template: {str(e)}"
             )
 
-    @staticmethod
-    async def get_template_versions(
-        db: Session,
-        template_id: int,
-        limit: int = 10,
-        offset: int = 0
-    ) -> List[TemplateVersion]:
-        """Get version history for a template"""
-        try:
-            versions = (
-                db.query(TemplateVersion)
-                .filter(TemplateVersion.template_id == template_id)
-                .order_by(desc(TemplateVersion.created_at))
-                .offset(offset)
-                .limit(limit)
-                .all()
-            )
-            return versions
-            
-        except Exception as e:
-            logger.error(f"Failed to get template versions: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to get template versions"
-            )
+
 
     @staticmethod
     async def search_templates(
@@ -646,69 +611,27 @@ class TemplateService:
 
     # Private helper methods
     @staticmethod
-    async def _create_new_version(
-        db: Session,
-        template: Template,
-        user_id: int,
-        template_file: Optional[UploadFile],
-        preview_file: Optional[UploadFile],
-        changes: List[str]
-    ) -> TemplateVersion:
-        """Create a new version of a template"""
-        try:
-            # Validate files if provided
-            if template_file and preview_file:
-                await TemplateService._validate_template_files(template_file, preview_file)
-            
-            # Generate new version number
-            current_version = template.latest_version
-            new_version = TemplateService._increment_version(current_version)
-            
-            # Store new files
-            template_path = None
-            preview_path = None
-            content_hash = None
-            
-            if template_file:
-                template_path = await StorageService.store_template_file(
-                    template_file,
-                    f"templates/{template.id}/{new_version}/{template_file.filename}"
-                )
-                content_hash = await TemplateService._calculate_file_hash(template_file)
-            
-            if preview_file:
-                preview_path = await StorageService.store_preview_file(
-                    preview_file,
-                    f"previews/{template.id}/{new_version}/{preview_file.filename}"
-                )
-            
-            # Create version record
-            version = TemplateVersion(
-                template_id=template.id,
-                version_number=new_version,
-                content_hash=content_hash or template.versions[-1].content_hash,
-                template_file_path=template_path or template.template_file_url,
-                preview_file_path=preview_path or template.preview_image_url,
-                created_by=user_id,
-                changes=changes,
-                metadata=template.metadata
-            )
-            
-            # Update template
-            template.current_version = new_version
-            template.latest_version = new_version
-            template.total_versions += 1
-            if template_path:
-                template.template_file_url = template_path
-            if preview_path:
-                template.preview_image_url = preview_path
-            
-            db.add(version)
-            return version
-            
-        except Exception as e:
-            logger.error(f"Failed to create new version: {str(e)}", exc_info=True)
-            raise
+    async def _calculate_template_hash(template_file: UploadFile) -> str:
+        content_hash = await TemplateService._calculate_file_hash(template_file)
+        return content_hash
+
+    @staticmethod
+    async def _store_preview_file(preview_file: UploadFile, template_id: int) -> str:
+        preview_path = await StorageService.store_preview_file(
+            preview_file,
+            os.path.join("previews", str(template_id), preview_file.filename)
+        )
+        return preview_path
+
+    @staticmethod
+
+    @staticmethod
+    async def _update_template_files(template: Template, template_path: str = None, preview_path: str = None) -> None:
+        """Update template file paths"""
+        if template_path:
+            template.file_path = template_path
+        if preview_path:
+            template.preview_file_path = preview_path
 
     @staticmethod
     async def _validate_template_files(
@@ -767,12 +690,6 @@ class TemplateService:
         return "-".join(title.lower().split())
 
     @staticmethod
-    def _increment_version(version: str) -> str:
-        """Increment semantic version number"""
-        major, minor, patch = map(int, version.split("."))
-        return f"{major}.{minor}.{patch + 1}"
-
-    @staticmethod
     async def _calculate_file_hash(file: UploadFile) -> str:
         """Calculate SHA-256 hash of file contents"""
         hasher = hashlib.sha256()
@@ -793,115 +710,7 @@ class TemplateService:
         'percentage': lambda old, new: old * (1 + new/100)
     }
 
-    @staticmethod
-    async def create_template(db: Session, template_data: TemplateCreate,
-                            template_file: UploadFile, preview_file: UploadFile, user_id: int) -> Template:
-        """Create new template with file upload"""
 
-        # Validate files
-        template_ext = Path(template_file.filename).suffix.lower()
-        preview_ext = Path(preview_file.filename).suffix.lower()
-        
-        if template_ext not in TemplateService.ALLOWED_TEMPLATE_EXTENSIONS:
-            raise ValueError(f"Invalid template file type. Allowed: {TemplateService.ALLOWED_TEMPLATE_EXTENSIONS}")
-        
-        if preview_ext not in TemplateService.ALLOWED_PREVIEW_EXTENSIONS:
-            raise ValueError(f"Invalid preview file type. Allowed: {TemplateService.ALLOWED_PREVIEW_EXTENSIONS}")
-
-        # Generate unique filenames
-        template_filename = f"{uuid.uuid4()}{template_ext}"
-        preview_filename = f"{uuid.uuid4()}{preview_ext}"
-        
-        template_path = os.path.join(settings.TEMPLATES_PATH, template_filename)
-        preview_path = os.path.join(settings.PREVIEWS_PATH, preview_filename)
-
-        # Save uploaded files
-        template_content = await template_file.read()
-        preview_content = await preview_file.read()
-        
-        if len(template_content) > TemplateService.MAX_FILE_SIZE:
-            raise ValueError("Template file too large")
-        if len(preview_content) > TemplateService.MAX_FILE_SIZE:
-            raise ValueError("Preview file too large")
-            
-        os.makedirs(settings.TEMPLATES_PATH, exist_ok=True)
-        os.makedirs(settings.PREVIEWS_PATH, exist_ok=True)
-        
-        with open(template_path, "wb") as f:
-            f.write(template_content)
-        with open(preview_path, "wb") as f:
-            f.write(preview_content)
-
-        # Calculate file hash and size
-        file_hash = TemplateService._calculate_file_hash(template_path)
-        file_size = os.path.getsize(template_path)
-
-        # Extract placeholders from document
-        placeholders = TemplateService._extract_placeholders_from_file(template_path)
-
-        # Detect document font
-        font_family, font_size = TemplateService._detect_document_font(template_path)
-        if template_data.font_family == "Times New Roman":  # Default
-            template_data.font_family = font_family
-        if template_data.font_size == 12:  # Default
-            template_data.font_size = font_size
-
-        # Create template record
-        template = Template(
-            name=template_data.name,
-            description=template_data.description,
-            category=template_data.category,
-            type=template_data.type,
-            file_path=template_filename,
-            preview_image_url=preview_filename,
-            original_filename=template_file.filename,
-            file_size=file_size,
-            file_hash=file_hash,
-            placeholders=json.dumps([p.__dict__ for p in placeholders]),
-            language=template_data.language,
-            font_family=template_data.font_family,
-            font_size=template_data.font_size,
-            is_public=template_data.is_public,
-            is_premium=template_data.is_premium,
-            price=template_data.price,
-            tags=template_data.tags,
-            keywords=template_data.keywords,
-            created_by=user_id,
-            current_version="1.0.0",
-            first_version="1.0.0",
-            latest_version="1.0.0",
-            total_versions=1,
-            approval_status='pending'
-        )
-
-        db.add(template)
-        db.commit()
-        db.refresh(template)
-
-        # Create placeholder records
-        for placeholder_data in placeholders:
-            placeholder = Placeholder(
-                template_id=template.id,
-                name=placeholder_data.name,
-                display_name=placeholder_data.display_name,
-                placeholder_type=placeholder_data.placeholder_type,
-                paragraph_index=placeholder_data.paragraph_index,
-                start_run_index=placeholder_data.start_run_index,
-                end_run_index=placeholder_data.end_run_index,
-                bold=placeholder_data.bold,
-                italic=placeholder_data.italic,
-                underline=placeholder_data.underline,
-                casing=placeholder_data.casing,
-                is_required=placeholder_data.is_required
-            )
-            db.add(placeholder)
-
-        db.commit()
-
-        # Cache template for faster access
-        TemplateService._cache_template(template)
-
-        return template
 
     @staticmethod
     def update_template(db: Session, template: Template, template_update: TemplateUpdate) -> Template:
