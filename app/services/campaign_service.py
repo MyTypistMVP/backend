@@ -381,8 +381,8 @@ class CampaignService:
             logger.error(f"Failed to send campaign email: {e}")
             return {"success": False, "error": str(e)}
 
-    def _gift_campaign_tokens(self, db: Session, campaign: Campaign, user: User) -> Dict[str, Any]:
-        """Gift tokens to user as part of campaign"""
+    async def _gift_campaign_tokens(self, db: Session, campaign: Campaign, user: User) -> Dict[str, Any]:
+        """Gift tokens to user as part of campaign with notification"""
         try:
             if not campaign.token_amount or campaign.token_amount <= 0:
                 return {"success": False, "error": "Invalid token amount"}
@@ -408,6 +408,23 @@ class CampaignService:
             )
 
             if success:
+                # Send notification about reward
+                await CampaignNotificationService.notify_campaign_reward(
+                    user_id=user.id,
+                    campaign_id=campaign.id,
+                    reward_amount=campaign.token_amount,
+                    token_type=token_type
+                )
+
+                # Track campaign engagement
+                campaign.tokens_distributed += campaign.token_amount
+                campaign.recipients_count += 1
+
+                if campaign.token_message:
+                    campaign.emails_sent += 1
+
+                db.commit()
+
                 return {
                     "success": True,
                     "amount": campaign.token_amount,

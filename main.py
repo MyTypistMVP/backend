@@ -18,7 +18,7 @@ from config import settings
 from database import engine, SessionLocal
 from app.models import user, template, document, signature, visit, payment, audit
 from app.services.feedback_service import Feedback  # Import feedback model
-from app.routes import auth, documents, templates, signatures, analytics, payments, admin, monitoring, feedback
+from app.routes import auth, documents, templates, signatures, analytics, payments, admin, monitoring, feedback, referrals
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.security import SecurityMiddleware
 from app.middleware.audit import AuditMiddleware
@@ -283,6 +283,13 @@ app.include_router(monitoring.router, prefix="/api/monitoring", tags=["Monitorin
 
 # Include feedback system
 app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
+
+# Include referral system
+app.include_router(referrals.router, prefix="/api/referrals", tags=["Referrals"])
+
+# Include admin rewards system
+from app.routes import admin_rewards
+app.include_router(admin_rewards.router)
 
 # Include push notifications
 try:
