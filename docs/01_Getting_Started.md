@@ -177,8 +177,8 @@ APP_NAME=MyTypist Backend
 API_PREFIX=/api
 TIMEZONE=Africa/Lagos
 
-# Database (Development)
-DATABASE_URL=postgresql://dev_user:dev_password@localhost:5432/mytypist_dev
+# Database (SQLite for development)
+DATABASE_URL=sqlite:///./storage/mytypist_dev.db
 
 # Redis (optional for development)
 REDIS_URL=redis://localhost:6379/0
@@ -634,6 +634,8 @@ DB_MAX_OVERFLOW=35
 DB_POOL_TIMEOUT=30
 DB_POOL_RECYCLE=3600
 
+# SQLite (Development)
+DATABASE_URL=sqlite:///./storage/mytypist.db
 ```
 
 #### Security Configuration

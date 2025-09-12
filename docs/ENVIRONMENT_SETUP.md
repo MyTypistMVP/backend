@@ -54,6 +54,8 @@ DB_MAX_OVERFLOW=30
 DB_POOL_TIMEOUT=30
 DB_POOL_RECYCLE=3600
 
+# SQLite (Development)
+DATABASE_URL=sqlite:///./storage/mytypist.db
 ```
 
 ### Redis Configuration
@@ -171,7 +173,7 @@ DEBUG=true
 SECRET_KEY=dev-secret-key-not-for-production
 
 # Local Database
-DATABASE_URL=postgresql://dev_user:dev_password@localhost:5432/mytypist_dev
+DATABASE_URL=sqlite:///./storage/mytypist_dev.db
 
 # Local Redis
 REDIS_URL=redis://localhost:6379/0
