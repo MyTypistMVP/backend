@@ -2,6 +2,9 @@
 Enhanced Notification Service
 Comprehensive notification system for security alerts, user activities, and system events
 """
+import logging
+
+logger = logging.getLogger(__name__)
 class NotificationPreferences(Base):
     """User notification preferences"""
     __tablename__ = "notification_preferences"
@@ -12,7 +15,8 @@ class NotificationPreferences(Base):
     # Channel preferences
     email_enabled = Column(Boolean, nullable=False, default=True)
     in_app_enabled = Column(Boolean, nullable=False, default=True)
-    sms_enabled = Column(Boolean, nullable=False, default=False)me import datetime, timedelta
+    sms_enabled = Column(Boolean, nullable=False, default=False)
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 from sqlalchemy.orm import Session
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, JSON, func, desc, and_

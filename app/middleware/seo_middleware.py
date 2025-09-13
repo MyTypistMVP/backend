@@ -69,11 +69,13 @@ class SEOMiddleware(BaseHTTPMiddleware):
     async def _get_document(self, request: Request, document_id: str):
         """Get document from database"""
         async with request.app.state.db() as db:
+            from app.models.document import Document
             return await db.query(Document).filter(Document.id == document_id).first()
     
     async def _get_template(self, request: Request, template_id: str):
         """Get template from database"""
         async with request.app.state.db() as db:
+            from app.models.template import Template
             return await db.query(Template).filter(Template.id == template_id).first()
     
     async def _inject_meta_tags(self, response: Response, meta_tags: dict) -> bytes:

@@ -16,6 +16,7 @@ from app.models.user import User
 from app.services.analytics_service import AnalyticsService
 from app.services.audit_service import AuditService
 from app.services.performance_service import PerformanceService
+from app.schemas.analytics import TimePeriod
 from app.utils.security import get_current_active_user
 
 router = APIRouter()

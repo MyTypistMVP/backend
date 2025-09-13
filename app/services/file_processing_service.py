@@ -16,6 +16,9 @@ from config import settings
 from app.services.encryption_service import EncryptionService
 from app.services.audit_service import AuditService
 from app.utils.validation import validate_file_upload
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class FileProcessingService:
@@ -278,7 +281,7 @@ class FileSecurityService:
 
             scan_time = time.time() - scan_start
 
-        scan_result = {
+            scan_result = {
                 "is_safe": len(threats_found) == 0,
                 "threats_found": list(set(threats_found)),
                 "scan_engines": engines_used,
@@ -410,27 +413,7 @@ class FileSecurityService:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_sha256.update(chunk)
         return hash_sha256.hexdigest()
-            with open(file_path, 'rb') as f:
-                content = f.read(4096)  # Read first 4KB
-
-                # Check for suspicious patterns
-                suspicious_patterns = [
-                    b'eval(',
-                    b'exec(',
-                    b'<script',
-                    b'javascript:',
-                    b'vbscript:'
-                ]
-
-                for pattern in suspicious_patterns:
-                    if pattern in content.lower():
-                        scan_result["is_safe"] = False
-                        scan_result["threats_found"].append(f"Suspicious pattern: {pattern.decode()}")
-
-        except Exception as e:
-            scan_result["error"] = str(e)
-
-        return scan_result
+        
 
     @staticmethod
     async def quarantine_file(file_path: str, reason: str) -> bool:

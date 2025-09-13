@@ -177,8 +177,7 @@ APP_NAME=MyTypist Backend
 API_PREFIX=/api
 TIMEZONE=Africa/Lagos
 
-# Database (SQLite for development)
-DATABASE_URL=sqlite:///./storage/mytypist_dev.db
+# Database (Postgres for development)
 
 # Redis (optional for development)
 REDIS_URL=redis://localhost:6379/0
@@ -435,8 +434,8 @@ FROM_EMAIL=noreply@mytypist.com
 FROM_NAME=MyTypist
 
 # CORS (restrict to your domains)
-ALLOWED_ORIGINS=["https://mytypist.com", "https://app.mytypist.com"]
-ALLOWED_HOSTS=["mytypist.com", "api.mytypist.com"]
+ALLOWED_ORIGINS=["https://mytypist.net", "https://app.mytypist.net"]
+ALLOWED_HOSTS=["mytypist.net", "api.mytypist.net"]
 
 # Performance Settings
 WORKERS=4
@@ -504,8 +503,8 @@ server {
     server_name api.mytypist.com;
 
     # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/api.mytypist.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.mytypist.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/api.mytypist.net/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.mytypist.net/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
 
@@ -538,7 +537,7 @@ server {
 # Redirect HTTP to HTTPS
 server {
     listen 80;
-    server_name api.mytypist.com;
+    server_name api.mytypist.net;
     return 301 https://$server_name$request_uri;
 }
 ```
@@ -549,7 +548,7 @@ server {
 sudo apt install certbot python3-certbot-nginx
 
 # Obtain SSL certificate
-sudo certbot --nginx -d api.mytypist.com
+sudo certbot --nginx -d api.mytypist.net
 
 # Auto-renewal
 sudo crontab -e
@@ -603,10 +602,10 @@ curl https://api.mytypist.com/health
 # Test API functionality
 curl -X POST https://api.mytypist.com/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@mytypist.com","password":"your_admin_password"}'
+  -d '{"email":"admin@mytypist.net","password":"your_admin_password"}'
 
 # Check SSL configuration
-curl -I https://api.mytypist.com/
+curl -I https://api.mytypist.net/
 ```
 
 ---
@@ -634,8 +633,6 @@ DB_MAX_OVERFLOW=35
 DB_POOL_TIMEOUT=30
 DB_POOL_RECYCLE=3600
 
-# SQLite (Development)
-DATABASE_URL=sqlite:///./storage/mytypist.db
 ```
 
 #### Security Configuration
@@ -777,7 +774,7 @@ sudo certbot certificates
 sudo certbot renew --dry-run
 
 # Test SSL configuration
-curl -I https://api.mytypist.com/
+curl -I https://api.mytypist. net/
 ```
 
 #### 4. High Memory Usage

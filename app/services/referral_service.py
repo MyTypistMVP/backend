@@ -61,7 +61,7 @@ class ReferralService:
             }
 
     @staticmethod
-    def process_referral(
+    async def process_referral(
         db: Session,
         referral_code: str,
         new_user_id: int,
@@ -133,6 +133,7 @@ class ReferralService:
             )
 
             # Validate that referee has made a purchase or created a document
+            from app.services.user_activity_service import UserActivityService
             has_valid_activity = await UserActivityService.validate_user_activity(
                 db=db,
                 user_id=new_user_id,
@@ -154,6 +155,7 @@ class ReferralService:
                 tracking.referee_ip = ip_address
 
                 # Check for suspicious activity
+                from app.services.fraud_detection_service import FraudDetectionService
                 is_suspicious = await FraudDetectionService.check_referral(
                     db=db,
                     tracking=tracking,

@@ -102,57 +102,7 @@ async def get_document_analytics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve analytics: {str(e)}"
         )
-            DocumentShare.share_token == share_token,
-            DocumentShare.is_active == True
-        ).first()
-
-        if not share:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Share link not found or expired"
-            )
-
-        # Check if expired
-        from datetime import datetime
-        if datetime.utcnow() > share.expires_at:
-            share.is_active = False
-            db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_410_GONE,
-                detail="Share link has expired"
-            )
-
-        # Get document title (without content)
-        from app.models.document import Document
-        document = db.query(Document).filter(
-            Document.id == share.document_id
-        ).first()
-
-        if not document:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Document not found"
-            )
-
-        return {
-            "success": True,
-            "share_token": share_token,
-            "document_title": document.title,
-            "expires_at": share.expires_at.isoformat(),
-            "requires_password": bool(share.share_password),
-            "max_views": share.max_views,
-            "current_views": share.current_views,
-            "views_remaining": (share.max_views - share.current_views) if share.max_views else None,
-            "created_at": share.created_at.isoformat()
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get shared document info: {str(e)}"
-        )
+        
 
 
 @router.post("/shared/{share_token}/access", response_model=Dict[str, Any])

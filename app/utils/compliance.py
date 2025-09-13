@@ -283,6 +283,7 @@ def delete_user_data(db: Session, user_id: int, retain_legal_data: bool = True) 
             deletion_report["retained_records"]["signed_documents"] = deletion_report["retained_records"].get("signed_documents", 0) + 1
         else:
             # Delete document and file
+            import os
             if doc.file_path and os.path.exists(doc.file_path):
                 try:
                     os.remove(doc.file_path)

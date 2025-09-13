@@ -98,6 +98,7 @@ async def convert_guest_to_user(
         db.add(doc)
     
     # Add conversion tracking
+    from app.services.audit_service import AuditService
     AuditService.log_user_activity(
         db,
         user.id,

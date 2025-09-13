@@ -643,9 +643,7 @@ class DraftSystemService:
             db.refresh(document)
 
             # Document created from draft
-                placeholder_data=json.loads(draft.placeholder_data) if draft.placeholder_data else {},
-                change_type="create_from_draft"
-            )
+            
 
             return {"success": True, "document_id": document.id}
 

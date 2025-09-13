@@ -41,7 +41,7 @@ This report details the comprehensive audit and enhancement of the MyTypist docu
 
 ---
 
-### **2. Template Marketplace System** ✅ **COMPLETE**
+### **2. Template Discovery & Sales System** ✅ **COMPLETE**
 
 #### **Implemented Features:**
 - 🆕 **Full Marketplace Homepage** with featured, trending, and new templates
@@ -55,10 +55,10 @@ This report details the comprehensive audit and enhancement of the MyTypist docu
 - 🆕 **Category Management** with statistics
 - 🆕 **Template Recommendation Engine**
 
-#### **Marketplace Features:**
+#### **Template Features:**
 - **Template Discovery**: Featured, trending, new, and recommended templates
 - **Advanced Filtering**: By category, price, rating, language, tags
-- **Purchase Flow**: Wallet-based payments with transaction history
+- **Purchase Flow**: Wallet/token-based payments with transaction history
 - **Creator Tools**: Upload, pricing, analytics, revenue tracking
 - **User Experience**: Reviews, favorites, purchase history
 - **Admin Tools**: Template approval, moderation, analytics

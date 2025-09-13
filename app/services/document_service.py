@@ -31,12 +31,19 @@ from app.schemas.document import (
 from app.services.encryption_service import EncryptionService
 from database import get_db
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Redis client for caching
 redis_client = redis.Redis(
     host=settings.REDIS_HOST,
     port=settings.REDIS_PORT,
     decode_responses=True
 )
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class DocumentService:

@@ -179,6 +179,7 @@ from config import settings
 from app.models.template import Template, Placeholder
 from app.models.template_management import TemplateCategory
 from app.models.review import TemplateReview
+from app.models.template_purchase import TemplatePurchase
 from app.models.user import User
 from app.schemas.template import (
     TemplateCreate,
@@ -195,6 +196,8 @@ from app.utils.security import validate_file_security
 from app.utils.validation import validate_template_metadata
 from app.services.audit_service import AuditService
 from database import get_db
+from app.services.wallet_service import WalletService
+from app.services.token_management_service import TokenManagementService
 
 # Redis client for caching
 redis_client = redis.Redis(
@@ -417,6 +420,184 @@ class TemplateService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to approve template: {str(e)}"
             )
+
+    # --- Template discovery & compatibility wrappers ---
+    @staticmethod
+    def get_templates_home(db: Session, user_id: int) -> dict:
+        """Return homepage data for templates (featured, trending, new)."""
+        featured = db.query(Template).filter(Template.is_featured == True, Template.is_active == True).limit(10).all()
+        trending = db.query(Template).filter(Template.is_active == True).order_by(desc(Template.download_count)).limit(10).all()
+        newest = db.query(Template).filter(Template.is_active == True).order_by(desc(Template.created_at)).limit(10).all()
+
+        def to_short(tmpl):
+            return {
+                "id": tmpl.id,
+                "name": tmpl.name or getattr(tmpl, 'title', None),
+                "preview": getattr(tmpl, 'preview_file_path', None) or getattr(tmpl, 'preview_image_url', None),
+                "is_premium": tmpl.is_premium,
+                "token_cost": getattr(tmpl, 'token_cost', getattr(tmpl, 'price', 0))
+            }
+
+        result = {
+            "featured": [to_short(t) for t in featured],
+            "trending": [to_short(t) for t in trending],
+            "new": [to_short(t) for t in newest]
+        }
+    # Backwards compatibility was previously provided via deprecated aliases; removed.
+        return result
+
+    @staticmethod
+    def search_templates_compat(db: Session, query: Optional[str], category: Optional[str], min_price: Optional[float], max_price: Optional[float], rating: Optional[float], sort_by: str, page: int, per_page: int, user_id: int):
+        """Search templates with marketplace-style filters (compatibility)."""
+        q = db.query(Template).filter(Template.is_active == True)
+        if query:
+            q = q.filter(Template.name.ilike(f"%{query}%") | Template.description.ilike(f"%{query}%"))
+        if category:
+            q = q.filter(Template.category == category)
+        if min_price is not None:
+            q = q.filter(Template.price >= min_price)
+        if max_price is not None:
+            q = q.filter(Template.price <= max_price)
+        # rating filter uses TemplateReview aggregate
+        total = q.count()
+        items = q.order_by(desc(Template.created_at)).offset((page-1)*per_page).limit(per_page).all()
+        return {"total": total, "page": page, "per_page": per_page, "templates": [TemplateService._short_template_info(t) for t in items]}
+
+    @staticmethod
+    def _short_template_info(tmpl: Template) -> dict:
+        return {
+            "id": tmpl.id,
+            "name": tmpl.name or getattr(tmpl, 'title', None),
+            "preview": getattr(tmpl, 'preview_file_path', None) or getattr(tmpl, 'preview_image_url', None),
+            "is_premium": tmpl.is_premium,
+            "token_cost": getattr(tmpl, 'token_cost', getattr(tmpl, 'price', 0)),
+            "rating": getattr(tmpl, 'rating', 0),
+            "download_count": getattr(tmpl, 'download_count', 0)
+        }
+
+    @staticmethod
+    def get_template_details(db: Session, template_id: int, user_id: Optional[int] = None) -> Optional[dict]:
+        tmpl = db.query(Template).filter(Template.id == template_id, Template.is_active == True).first()
+        if not tmpl:
+            return None
+        details = {
+            "id": tmpl.id,
+            "name": tmpl.name or getattr(tmpl, 'title', None),
+            "description": tmpl.description,
+            "category": tmpl.category,
+            "is_premium": tmpl.is_premium,
+            "token_cost": getattr(tmpl, 'token_cost', getattr(tmpl, 'price', 0)),
+            "rating": getattr(tmpl, 'rating', 0),
+            "rating_count": getattr(tmpl, 'rating_count', 0),
+            "preview": getattr(tmpl, 'preview_file_path', None) or getattr(tmpl, 'preview_image_url', None)
+        }
+    return details
+
+    @staticmethod
+    def purchase_template(db: Session, template_id: int, user_id: int, payment_method: str = "tokens") -> dict:
+        """Purchase template: supports tokens (pay-as-you-go) or wallet/stripe via WalletService."""
+        tmpl = db.query(Template).filter(Template.id == template_id, Template.is_active == True).first()
+        if not tmpl:
+            return {"success": False, "error": "Template not found"}
+
+        cost = int(getattr(tmpl, 'token_cost', getattr(tmpl, 'price', 0)))
+
+        # If free or zero cost
+        if cost == 0:
+            purchase = TemplatePurchase(user_id=user_id, template_id=template_id, amount=0, currency='TOK')
+            db.add(purchase)
+            db.commit()
+            return {"success": True, "purchase_id": purchase.id, "amount": 0}
+
+        if payment_method in ("tokens", "wallet"):
+            # Check wallet/token balance
+            try:
+                balance = WalletService.get_wallet_balance(db, user_id)
+                if balance.get("balance", 0) < cost:
+                    return {"success": False, "error": "Insufficient token balance", "required": cost}
+
+                debit = WalletService.debit_tokens(db, user_id, cost, f"Template purchase {template_id}")
+                if not debit.get("success", False):
+                    return {"success": False, "error": "Failed to debit tokens"}
+
+                # record purchase
+                purchase = TemplatePurchase(user_id=user_id, template_id=template_id, amount=cost, currency='TOK')
+                db.add(purchase)
+                db.commit()
+
+                return {"success": True, "purchase_id": purchase.id, "amount": cost}
+            except Exception as e:
+                logger.error(f"Purchase failed: {e}")
+                return {"success": False, "error": str(e)}
+
+        # Other payment methods (e.g., stripe) not implemented in wrapper
+        return {"success": False, "error": "Unsupported payment method"}
+
+    @staticmethod
+    def add_template_review(db: Session, template_id: int, user_id: int, rating: int, title: Optional[str], comment: Optional[str]) -> dict:
+        # Create or update review
+        existing = db.query(TemplateReview).filter(TemplateReview.template_id == template_id, TemplateReview.user_id == user_id).first()
+        if existing:
+            existing.rating = rating
+            existing.title = title
+            existing.comment = comment
+            existing.updated_at = datetime.utcnow()
+            db.commit()
+            review_id = existing.id
+        else:
+            review = TemplateReview(template_id=template_id, user_id=user_id, rating=rating, title=title, comment=comment)
+            db.add(review)
+            db.commit()
+            review_id = review.id
+
+        # Update aggregate ratings on template if present
+        try:
+            avg = db.query(func.avg(TemplateReview.rating)).filter(TemplateReview.template_id == template_id).scalar() or 0
+            count = db.query(func.count(TemplateReview.id)).filter(TemplateReview.template_id == template_id).scalar() or 0
+            tmpl = db.query(Template).filter(Template.id == template_id).first()
+            if tmpl:
+                tmpl.rating = float(avg)
+                tmpl.rating_count = int(count)
+                db.commit()
+        except Exception:
+            db.rollback()
+
+        return {"success": True, "review_id": review_id}
+
+    @staticmethod
+    def toggle_favorite(db: Session, template_id: int, user_id: int) -> dict:
+        # Simple favorites table assumed: TemplateFavorite
+        from app.models.template_favorite import TemplateFavorite
+        fav = db.query(TemplateFavorite).filter(TemplateFavorite.template_id == template_id, TemplateFavorite.user_id == user_id).first()
+        if fav:
+            db.delete(fav)
+            db.commit()
+            return {"success": True, "is_favorited": False}
+        else:
+            newfav = TemplateFavorite(template_id=template_id, user_id=user_id)
+            db.add(newfav)
+            db.commit()
+            return {"success": True, "is_favorited": True}
+
+    @staticmethod
+    def get_user_purchases(db: Session, user_id: int, page: int = 1, per_page: int = 20):
+        purchases = db.query(TemplatePurchase).filter(TemplatePurchase.user_id == user_id).order_by(desc(TemplatePurchase.created_at)).offset((page-1)*per_page).limit(per_page).all()
+        total = db.query(func.count(TemplatePurchase.id)).filter(TemplatePurchase.user_id == user_id).scalar() or 0
+        return {"total": total, "page": page, "per_page": per_page, "purchases": [ {"id": p.id, "template_id": p.template_id, "amount": p.amount, "created_at": p.created_at} for p in purchases ] }
+
+    @staticmethod
+    def get_user_favorites(db: Session, user_id: int, page: int = 1, per_page: int = 20):
+        from app.models.template_favorite import TemplateFavorite
+        favs = db.query(TemplateFavorite).filter(TemplateFavorite.user_id == user_id).order_by(desc(TemplateFavorite.created_at)).offset((page-1)*per_page).limit(per_page).all()
+        total = db.query(func.count(TemplateFavorite.id)).filter(TemplateFavorite.user_id == user_id).scalar() or 0
+        return {"total": total, "page": page, "per_page": per_page, "favorites": [{"template_id": f.template_id, "added_at": f.created_at} for f in favs]}
+
+    @staticmethod
+    def get_template_stats(db: Session) -> dict:
+        total_sales = db.query(func.count(TemplatePurchase.id)).scalar() or 0
+        total_revenue = db.query(func.sum(TemplatePurchase.amount)).scalar() or 0
+        top_templates = db.query(Template.id, func.count(TemplatePurchase.id).label('sales')).join(TemplatePurchase, TemplatePurchase.template_id == Template.id).group_by(Template.id).order_by(desc('sales')).limit(10).all()
+        return {"total_sales": int(total_sales), "total_revenue": float(total_revenue), "top_templates": [ {"template_id": t[0], "sales": int(t[1])} for t in top_templates ]}
 
 
 

@@ -16,6 +16,9 @@ from app.models.template import Template
 from app.models.document import Document, DocumentStatus
 from app.models.payment import Payment, Subscription, PaymentStatus, SubscriptionStatus
 from app.models.audit import AuditLog, AuditLevel
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AdminService:

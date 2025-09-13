@@ -10,6 +10,11 @@ from app.services.token_management_service import TokenManagementService
 from app.services.referral_service import ReferralService
 from datetime import datetime
 from pydantic import BaseModel
+import logging
+
+from app.models.referral import ReferralProgram
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin/rewards", tags=["admin-rewards"])
 
@@ -147,6 +152,7 @@ async def update_campaign_metrics(
     current_user = Depends(AuthService.get_current_admin_user)
 ):
     """Manually update campaign metrics"""
+    from app.models.campaign import Campaign
     campaign = db.query(Campaign).filter(Campaign.id == request.campaign_id).first()
     if not campaign:
         raise HTTPException(
@@ -183,8 +189,9 @@ async def get_referral_programs(
     current_user = Depends(AuthService.get_current_admin_user)
 ):
     """Get list of referral programs"""
+    from app.models.referral import ReferralProgram
     query = db.query(ReferralProgram)
-    
+
     if active_only:
         query = query.filter(ReferralProgram.is_active == True)
     

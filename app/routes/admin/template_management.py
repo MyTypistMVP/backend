@@ -43,7 +43,7 @@ async def create_template(
 ):
     """Create a new template (admin only)"""
     try:
-        template = await TemplateManagementService.create_template(
+        template = await TemplateService.create_template(
             db=db,
             user_id=current_user.id,
             title=title,
@@ -86,8 +86,8 @@ async def update_template(
         }
         # Remove None values
         update_data = {k: v for k, v in update_data.items() if v is not None}
-        
-        template = await TemplateManagementService.update_template(
+
+        template = await TemplateService.update_template(
             db=db,
             template_id=template_id,
             user_id=current_user.id,
@@ -113,7 +113,7 @@ async def approve_template(
 ):
     """Approve or reject a template (admin only)"""
     try:
-        template = await TemplateManagementService.approve_template(
+        template = await TemplateService.approve_template(
             db=db,
             template_id=template_id,
             admin_id=current_user.id,
@@ -124,11 +124,6 @@ async def approve_template(
     except Exception as e:
         logger.error(f"Failed to approve template: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )

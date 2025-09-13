@@ -333,6 +333,7 @@ class PartnerService:
                 PartnerReferral.signed_up_at >= month_start
             ).count()
             
+            from sqlalchemy import func
             monthly_commission = db.query(func.sum(PartnerReferral.commission_amount)).filter(
                 PartnerReferral.partner_id == partner_id,
                 PartnerReferral.first_payment_at >= month_start
@@ -401,6 +402,7 @@ class PartnerService:
             )
             
             # Don't save until someone actually uses it
+            from config import settings
             referral_link = f"{settings.FRONTEND_URL}/signup?ref={referral_code}"
             
             return {

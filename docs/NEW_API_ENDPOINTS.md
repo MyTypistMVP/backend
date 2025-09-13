@@ -6,13 +6,14 @@ This document details all the new API endpoints added during the comprehensive b
 
 ---
 
-## **🛒 Template Marketplace API**
-**Base URL**: `/api/marketplace`
+## **Template Discovery & Usage API**
+All marketplace functionality has been consolidated into the templates APIs.
+**Base URL**: `/api/templates`
 
 ### **Public Endpoints**
 
 #### `GET /home`
-Get marketplace homepage with featured, trending, and new templates.
+Get templates homepage with featured, trending, and new templates.
 ```json
 {
   "featured_templates": [...],
@@ -25,7 +26,7 @@ Get marketplace homepage with featured, trending, and new templates.
 ```
 
 #### `GET /search`
-Advanced template search with filtering and sorting.
+Advanced template search with filtering and sorting (use `/api/templates/search`).
 **Query Parameters:**
 - `query`: Search query string
 - `category`: Filter by category
@@ -34,39 +35,39 @@ Advanced template search with filtering and sorting.
 - `sort_by`: Sort order (relevance, price_low, price_high, rating, popularity, newest)
 - `page`, `per_page`: Pagination
 
-#### `GET /templates/{template_id}`
-Get detailed template information including reviews and related templates.
+#### `GET /{template_id}`
+Get detailed template information including reviews and related templates (use `/api/templates/{template_id}`).
 
 ### **User Actions**
 
-#### `POST /templates/{template_id}/purchase`
-Purchase a template using wallet or payment method.
+#### `POST /{template_id}/purchase`
+Purchase or charge tokens for a template using wallet or token-based flow (use `/api/templates/{template_id}/purchase`).
 ```json
 {
   "payment_method": "wallet"
 }
 ```
 
-#### `POST /templates/{template_id}/review`
-Add or update a template review.
+#### `POST /{template_id}/review`
+Add or update a template review (use `/api/templates/{template_id}/review`).
 **Query Parameters:**
 - `rating`: 1-5 star rating
 - `title`: Review title (optional)
 - `comment`: Review comment (optional)
 
-#### `POST /templates/{template_id}/favorite`
-Toggle template favorite status.
+#### `POST /{template_id}/favorite`
+Toggle template favorite status (use `/api/templates/{template_id}/favorite`).
 
 ### **User Management**
 
 #### `GET /my/purchases`
-Get user's template purchase history with pagination.
+Get user's template purchase history with pagination (use `/api/templates/my/purchases`).
 
 #### `GET /my/favorites`
-Get user's favorite templates with pagination.
+Get user's favorite templates with pagination (use `/api/templates/my/favorites`).
 
 #### `GET /stats`
-Get marketplace statistics and analytics.
+Get templates statistics and analytics (use `/api/templates/stats`).
 
 ---
 
@@ -351,7 +352,7 @@ Create a test notification for development/testing.
 
 ## **📊 Enhanced Analytics Endpoints**
 
-### **Marketplace Analytics**
+### **Template Analytics**
 - Template performance metrics
 - Sales and revenue tracking
 - Popular categories and trends
@@ -433,7 +434,7 @@ All API calls are logged with:
 ```javascript
 // Search templates
 const searchTemplates = async (query) => {
-  const response = await fetch(`/api/marketplace/search?query=${query}`, {
+  const response = await fetch(`/api/templates/search?query=${query}`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   return response.json();
@@ -441,7 +442,7 @@ const searchTemplates = async (query) => {
 
 // Purchase template
 const purchaseTemplate = async (templateId) => {
-  const response = await fetch(`/api/marketplace/templates/${templateId}/purchase`, {
+  const response = await fetch(`/api/templates/${templateId}/purchase`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -470,7 +471,7 @@ const editDocument = async (documentId, placeholderData) => {
 ```swift
 // iOS Swift example
 func searchTemplates(query: String) async throws -> SearchResponse {
-    let url = URL(string: "\(baseURL)/api/marketplace/search?query=\(query)")!
+  let url = URL(string: "\(baseURL)/api/templates/search?query=\(query)")!
     var request = URLRequest(url: url)
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 

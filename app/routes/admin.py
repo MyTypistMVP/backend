@@ -22,6 +22,11 @@ from app.schemas.payment import PaymentResponse, SubscriptionResponse
 from app.services.admin_service import AdminService
 from app.services.audit_service import AuditService
 from app.utils.security import get_current_active_user
+from app.services.admin_dashboard_service import AdminDashboardService
+from app.services.auth_service import AuthService
+
+# Provide compatibility with routes expecting this dependency
+get_current_admin_user = AuthService.get_current_admin_user
 
 router = APIRouter()
 
@@ -43,19 +48,18 @@ async def admin_dashboard(
 ):
     """Get admin dashboard overview with real-time metrics"""
     try:
-        # Get real-time stats
         realtime = await AdminDashboardService.get_realtime_stats(db)
-        
+
         # Get today's summary
         today_summary = await AdminDashboardService.get_daily_summary(db, datetime.utcnow())
-        
+
         # Get weekly trend (last 7 days)
         weekly_summaries = []
         for i in range(7):
             date = datetime.utcnow() - timedelta(days=i)
             summary = await AdminDashboardService.get_daily_summary(db, date)
             weekly_summaries.append(summary)
-            
+
         return {
             "success": True,
             "realtime": realtime,
@@ -68,11 +72,6 @@ async def admin_dashboard(
             status_code=500,
             detail=f"Failed to get dashboard data: {str(e)}"
         )
-    from app.services.admin_dashboard_service import AdminDashboardService
-
-    dashboard_data = AdminDashboardService.get_comprehensive_dashboard_stats(db)
-
-    return dashboard_data
 
 
 @router.get("/stats/overview")

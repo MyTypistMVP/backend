@@ -147,7 +147,7 @@ async def register(
         )
         
     return response
-    )
+    
 
 
 @router.post("/login", response_model=TokenResponse)

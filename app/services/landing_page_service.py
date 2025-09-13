@@ -399,9 +399,9 @@ class LandingPageService:
         """Start free document creation process for guest with enhanced security"""
         try:
             # Enhanced fraud prevention
-                from app.services.fraud_detection_service import FraudDetectionService
-            
-                fraud_check = FraudDetectionService.check_free_token_eligibility(
+            from app.services.fraud_detection_service import FraudDetectionService
+
+            fraud_check = FraudDetectionService.check_free_token_eligibility(
                 db=db,
                 user_id=None,
                 session_id=session_id,

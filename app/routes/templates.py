@@ -5,7 +5,7 @@ Template management routes
 import os
 import hashlib
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -24,6 +24,11 @@ from app.schemas.template import (
 from app.services.template_service import TemplateService
 from app.services.audit_service import AuditService
 from app.utils.security import get_current_active_user
+from app.services.auth_service import AuthService
+
+# Provide a compatible dependency name used across routes
+get_current_admin_user = AuthService.get_current_admin_user
+from app.schemas.template_pricing import PriceUpdate, BulkPriceUpdate, SpecialOffer
 from app.utils.validation import validate_file_upload
 
 router = APIRouter()
@@ -367,6 +372,114 @@ async def preview_template(
 
     preview = TemplateService.generate_preview(template)
     return preview
+
+
+@router.get("/home")
+async def templates_home(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get templates homepage data (featured, trending, new)."""
+
+    data = TemplateService.get_templates_home(db, current_user.id)
+    return data
+
+
+@router.post("/{template_id}/purchase")
+async def purchase_template(
+    template_id: int,
+    payment_method: str = Form('tokens'),
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Purchase a template using tokens or wallet."""
+
+    result = TemplateService.purchase_template(db, template_id, current_user.id, payment_method)
+
+    if not result.get("success", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.get("error", "Purchase failed"))
+
+    AuditService.log_template_event(
+        "TEMPLATE_PURCHASED",
+        current_user.id,
+        request,
+        {"template_id": template_id, "purchase_id": result.get("purchase_id"), "amount": result.get("amount")}
+    )
+
+    return result
+
+
+@router.post("/{template_id}/review")
+async def add_template_review(
+    template_id: int,
+    rating: int = Form(...),
+    title: Optional[str] = Form(None),
+    comment: Optional[str] = Form(None),
+    request: Request = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Add or update a review for a template."""
+
+    res = TemplateService.add_template_review(db, template_id, current_user.id, rating, title, comment)
+    if not res.get("success", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=res.get("error", "Failed to add review"))
+
+    AuditService.log_template_event(
+        "TEMPLATE_REVIEWED",
+        current_user.id,
+        request,
+        {"template_id": template_id, "review_id": res.get("review_id"), "rating": rating}
+    )
+
+    return {"message": "Review added successfully", "review_id": res.get("review_id")}
+
+
+@router.post("/{template_id}/favorite")
+async def toggle_favorite(
+    template_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle favorite status for a template."""
+
+    res = TemplateService.toggle_favorite(db, template_id, current_user.id)
+    if not res.get("success", False):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to toggle favorite")
+
+    return {"message": "Favorite toggled", "is_favorited": res.get("is_favorited")}
+
+
+@router.get("/my/purchases")
+async def my_purchases(
+    page: int = 1,
+    per_page: int = 20,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current user's template purchases."""
+    return TemplateService.get_user_purchases(db, current_user.id, page, per_page)
+
+
+@router.get("/my/favorites")
+async def my_favorites(
+    page: int = 1,
+    per_page: int = 20,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current user's favorite templates."""
+    return TemplateService.get_user_favorites(db, current_user.id, page, per_page)
+
+
+@router.get("/stats")
+async def templates_stats(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get global template statistics."""
+    return TemplateService.get_template_stats(db)
 
 
 @router.get("/{template_id}/download", response_class=FileResponse)
