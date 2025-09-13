@@ -4,6 +4,7 @@ GDPR and compliance utilities
 
 import json
 import hashlib
+import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session

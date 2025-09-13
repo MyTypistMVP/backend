@@ -3,19 +3,6 @@ Enhanced Notification Service
 Comprehensive notification system for security alerts, user activities, and system events
 """
 import logging
-
-logger = logging.getLogger(__name__)
-class NotificationPreferences(Base):
-    """User notification preferences"""
-    __tablename__ = "notification_preferences"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
-
-    # Channel preferences
-    email_enabled = Column(Boolean, nullable=False, default=True)
-    in_app_enabled = Column(Boolean, nullable=False, default=True)
-    sms_enabled = Column(Boolean, nullable=False, default=False)
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set
 from sqlalchemy.orm import Session
@@ -33,6 +20,21 @@ from database import Base
 from app.models.user import User
 from config import settings
 from app.services.email_service import EmailService
+
+logger = logging.getLogger(__name__)
+
+
+class NotificationPreferences(Base):
+    """User notification preferences"""
+    __tablename__ = "notification_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+
+    # Channel preferences
+    email_enabled = Column(Boolean, nullable=False, default=True)
+    in_app_enabled = Column(Boolean, nullable=False, default=True)
+    sms_enabled = Column(Boolean, nullable=False, default=False)
 
 
 class NotificationType(str, Enum):

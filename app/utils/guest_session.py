@@ -138,21 +138,24 @@ async def convert_guest_to_user(
         db.add(doc)
     
     # Add conversion tracking
-    from app.services.audit_service import AuditService
-    AuditService.log_user_activity(
-        db,
-        user.id,
-        "GUEST_CONVERSION",
-        {
-            "session_id": session_id,
-            "previews_count": len(session_data.get("previews", [])),
-            "documents_count": len(session_data.get("documents", [])),
-            "session_duration_hours": (
-                datetime.fromisoformat(session_data["last_activity"]) -
-                datetime.fromisoformat(session_data["created_at"])
-            ).total_seconds() / 3600
-        }
-    )
+    try:
+        from app.services.audit_service import AuditService
+        AuditService.log_user_activity(
+            db,
+            user.id,
+            "GUEST_CONVERSION",
+            {
+                "session_id": session_id,
+                "previews_count": len(session_data.get("previews", [])),
+                "documents_count": len(session_data.get("documents", [])),
+                "session_duration_hours": (
+                    datetime.fromisoformat(session_data["last_activity"]) -
+                    datetime.fromisoformat(session_data["created_at"])
+                ).total_seconds() / 3600
+            }
+        )
+    except Exception as e:
+        print(f"Audit logging failed during guest conversion: {e}")
     
     db.commit()
     

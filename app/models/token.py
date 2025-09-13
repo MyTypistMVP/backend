@@ -84,7 +84,7 @@ class UserToken(Base):
     @property
     def can_claim_welcome_bonus(self):
         """Check if user can claim welcome bonus"""
-        return not self.welcome_bonus_claimed
+        return not getattr(self, 'welcome_bonus_claimed', True)
 
 
 class TokenTransaction(Base):
