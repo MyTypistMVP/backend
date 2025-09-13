@@ -72,8 +72,8 @@ class UserToken(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     
     # Relationships
-    user = relationship("User", backref="token_account")
-    referrer = relationship("User", remote_side="User.id", backref="referrals")
+    user = relationship("User", foreign_keys=[user_id], backref="token_account")
+    referrer = relationship("User", foreign_keys=[referred_by], remote_side="User.id", backref="referrals")
     
     @property
     def total_tokens(self):

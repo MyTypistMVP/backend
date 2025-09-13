@@ -14,20 +14,42 @@ from database import get_db
 import redis
 from config import settings
 
-# Create Redis client
-try:
-    redis_client = redis.Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        decode_responses=True
-    )
-except:
-    # Fallback mock for development
-    class MockRedis:
-        def exists(self, key): return False
-        def setex(self, key, time, value): return True
-        def get(self, key): return None
-        def delete(self, key): return True
+# Create Redis client with proper fallback handling
+class MockRedis:
+    def __init__(self):
+        self._data = {}
+        
+    def exists(self, key): 
+        return key in self._data
+    
+    def setex(self, key, time, value): 
+        self._data[key] = value
+        return True
+        
+    def get(self, key): 
+        return self._data.get(key)
+        
+    def delete(self, key): 
+        if key in self._data:
+            del self._data[key]
+        return True
+
+# Check if Redis should be used and is available
+if settings.REDIS_ENABLED:
+    try:
+        redis_client = redis.Redis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            decode_responses=True
+        )
+        # Test connection
+        redis_client.ping()
+        print("✅ Redis client connected for guest sessions")
+    except Exception as e:
+        print(f"⚠️ Redis connection failed, using mock client: {e}")
+        redis_client = MockRedis()
+else:
+    print("ℹ️ Using mock Redis client for guest sessions (Redis disabled)")
     redis_client = MockRedis()
 
 
