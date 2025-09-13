@@ -67,14 +67,3 @@ dependencies = [
     "pyjwt>=2.10.1",
     "maxminddb>=2.8.2",
 ]
-
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["app*"]
-
-[project.scripts]
-mytypist-backend = "main:app"
