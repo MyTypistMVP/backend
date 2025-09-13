@@ -47,9 +47,6 @@ env.bak/
 # local data
 instance/
 
-# attachments / large assets (keep in repo only if required)
-attached_assets
-
 # compiled static
 *.pyc
 
