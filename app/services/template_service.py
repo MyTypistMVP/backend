@@ -448,7 +448,7 @@ class TemplateService:
 
     @staticmethod
     def search_templates_compat(db: Session, query: Optional[str], category: Optional[str], min_price: Optional[float], max_price: Optional[float], rating: Optional[float], sort_by: str, page: int, per_page: int, user_id: int):
-        """Search templates with marketplace-style filters (compatibility)."""
+        """Search templates with compatibility filters (backwards compatibility)."""
         q = db.query(Template).filter(Template.is_active == True)
         if query:
             q = q.filter(Template.name.ilike(f"%{query}%") | Template.description.ilike(f"%{query}%"))
@@ -491,7 +491,7 @@ class TemplateService:
             "rating_count": getattr(tmpl, 'rating_count', 0),
             "preview": getattr(tmpl, 'preview_file_path', None) or getattr(tmpl, 'preview_image_url', None)
         }
-    return details
+        return details
 
     @staticmethod
     def purchase_template(db: Session, template_id: int, user_id: int, payment_method: str = "tokens") -> dict:
@@ -704,7 +704,7 @@ class TemplateService:
                 detail="Failed to get template analytics"
             )
 
-    # Marketplace features
+    # Template features
     @staticmethod
     async def update_template_price(
         db: Session,
