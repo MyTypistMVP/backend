@@ -85,7 +85,7 @@ class Notification(Base):
     message = Column(Text, nullable=False)
 
     # Rich content
-    metadata = Column(JSON, nullable=True)  # Additional data
+    notification_metadata = Column(JSON, nullable=True)  # Additional data
     action_url = Column(String(500), nullable=True)  # URL for action button
     action_text = Column(String(100), nullable=True)  # Action button text
 

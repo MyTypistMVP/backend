@@ -2,7 +2,7 @@
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.database import get_db
+from database import get_db
 from app.services.auth_service import AuthService
 from app.services.campaign_service import CampaignService
 from app.services.campaign_analytics_service import CampaignAnalyticsService

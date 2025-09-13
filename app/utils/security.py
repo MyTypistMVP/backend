@@ -3,9 +3,10 @@ Security utility functions
 """
 
 from jose import jwt
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import Depends, HTTPException, status, Request
+from pathlib import Path
+from fastapi import Depends, HTTPException, status, Request, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,26 @@ from app.models.user import User, UserRole
 from app.services.auth_service import AuthService
 
 security = HTTPBearer()
+
+
+def validate_file_security(file: UploadFile) -> bool:
+    """Validate file security properties"""
+    try:
+        # Basic security validation for uploaded files
+        # Check file extension is safe
+        safe_extensions = ['.docx', '.pdf', '.txt', '.png', '.jpg', '.jpeg']
+        file_ext = Path(file.filename).suffix.lower() if file.filename else ''
+        
+        if file_ext not in safe_extensions:
+            return False
+            
+        # Check file size (max 10MB)
+        if hasattr(file, 'size') and file.size and file.size > 10 * 1024 * 1024:
+            return False
+            
+        return True
+    except Exception:
+        return False
 
 
 async def get_current_user(
@@ -87,6 +108,40 @@ async def verify_admin_role(
         )
     
     return current_user
+
+
+# Alias for compatibility
+require_admin = verify_admin_role
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Create JWT access token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
+
+
+def sanitize_content(content: str) -> str:
+    """Sanitize user content for security"""
+    if not content:
+        return ""
+    
+    # Basic HTML escaping and content sanitization
+    import html
+    sanitized = html.escape(content)
+    
+    # Remove any potential script tags or dangerous content
+    import re
+    sanitized = re.sub(r'<script[^>]*>.*?</script>', '', sanitized, flags=re.IGNORECASE | re.DOTALL)
+    sanitized = re.sub(r'javascript:', '', sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r'on\w+\s*=', '', sanitized, flags=re.IGNORECASE)
+    
+    return sanitized
 
 
 def verify_resource_access(user: User, resource_user_id: int, admin_override: bool = True) -> bool:

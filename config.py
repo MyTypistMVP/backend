@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     
     # Application
     APP_NAME: str = "MyTypist"
+    APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-this")
 
@@ -28,7 +29,7 @@ class Settings(BaseSettings):
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
     REDIS_URL: str = os.getenv("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}")
-    REDIS_ENABLED: bool = os.getenv("REDIS_ENABLED", "false").lower() == "true"
+    REDIS_ENABLED: bool = os.getenv("REDIS_ENABLED", "false").lower() == "true"  # Disabled by default in Replit
 
     # Celery
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", REDIS_URL)

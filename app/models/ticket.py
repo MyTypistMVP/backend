@@ -63,7 +63,7 @@ class Ticket(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     closed_at = Column(DateTime(timezone=True), nullable=True)
-    metadata = Column(JSON, nullable=True)
+    ticket_metadata = Column(JSON, nullable=True)
     
     # System info for debugging
     browser_info = Column(JSON, nullable=True)
@@ -95,7 +95,7 @@ class TicketResponse(Base):
     
     # Attachments and metadata
     attachments = Column(JSON, nullable=True)  # List of file paths/URLs
-    metadata = Column(JSON, nullable=True)
+    response_metadata = Column(JSON, nullable=True)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

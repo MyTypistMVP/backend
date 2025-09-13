@@ -64,7 +64,7 @@ class SearchRecommendation(Base):
 
     # Metadata
     reason = Column(Text, nullable=True)  # Why this was recommended
-    metadata = Column(JSON, nullable=True)
+    recommendation_metadata = Column(JSON, nullable=True)
 
     # Status
     is_active = Column(Boolean, nullable=False, default=True)

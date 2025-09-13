@@ -90,7 +90,7 @@ class WalletTransaction(Base):
     # Description and metadata
     description = Column(String(500), nullable=False)
     reference = Column(String(100), nullable=True, unique=True, index=True)  # External reference
-    metadata = Column(JSON, nullable=True)  # Additional transaction data
+    transaction_metadata = Column(JSON, nullable=True)  # Additional transaction data
 
     # Related entities
     related_payment_id = Column(Integer, nullable=True)  # Related payment record
@@ -599,7 +599,7 @@ class WalletService:
             "reference": transaction.reference,
             "balance_before": transaction.balance_before,
             "balance_after": transaction.balance_after,
-            "metadata": transaction.metadata,
+            "metadata": transaction.transaction_metadata,
             "related_template_id": transaction.related_template_id,
             "related_document_id": transaction.related_document_id,
             "related_user_id": transaction.related_user_id,

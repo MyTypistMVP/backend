@@ -249,7 +249,7 @@ class SecurityIncident(Base):
     resolved_at = Column(DateTime, nullable=True)
 
     # Metadata
-    metadata = Column(JSON, nullable=True)
+    security_metadata = Column(JSON, nullable=True)
     evidence = Column(JSON, nullable=True)
 
 
@@ -313,7 +313,7 @@ class AnomalyDetection(Base):
     detected_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
     # Metadata
-    metadata = Column(JSON, nullable=True)
+    anomaly_metadata = Column(JSON, nullable=True)
 
 
 class SecurityMonitoringService:

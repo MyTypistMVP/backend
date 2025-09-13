@@ -10,7 +10,25 @@ from sqlalchemy.orm import Session
 from app.models.document import Document
 from app.models.user import User
 from app.utils.security import create_access_token
-from database import get_db, redis_client
+from database import get_db
+import redis
+from config import settings
+
+# Create Redis client
+try:
+    redis_client = redis.Redis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        decode_responses=True
+    )
+except:
+    # Fallback mock for development
+    class MockRedis:
+        def exists(self, key): return False
+        def setex(self, key, time, value): return True
+        def get(self, key): return None
+        def delete(self, key): return True
+    redis_client = MockRedis()
 
 
 async def get_or_create_guest_session(request: Request) -> str:

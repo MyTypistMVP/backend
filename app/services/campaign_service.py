@@ -8,13 +8,13 @@ import json
 import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, Enum, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Session, relationship
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
 from enum import Enum as PyEnum
 
-from database import Base, get_db
+from database import get_db, Base
 from app.models.user import User
+from app.models.campaign import Campaign, CampaignType, CampaignStatus
 from app.services.email_service import EmailService
 from app.services.token_management_service import TokenManagementService
 from app.models.token import TokenType
@@ -22,85 +22,10 @@ from app.models.token import TokenType
 logger = logging.getLogger(__name__)
 
 
-class CampaignType(str, PyEnum):
-    """Campaign type enumeration"""
-    EMAIL_MARKETING = "email_marketing"
-    TOKEN_GIFTING = "token_gifting"
-    USER_ONBOARDING = "user_onboarding" 
-    RETENTION = "retention"
-    REACTIVATION = "reactivation"
-    SEASONAL_PROMOTION = "seasonal_promotion"
-    REFERRAL_BOOST = "referral_boost"
+# CampaignType and CampaignStatus are imported from app.models.campaign
 
 
-class CampaignStatus(str, PyEnum):
-    """Campaign status enumeration"""
-    DRAFT = "draft"
-    SCHEDULED = "scheduled"
-    RUNNING = "running"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-
-
-class Campaign(Base):
-    """Marketing campaigns with email and token distribution"""
-    __tablename__ = "campaigns"
-
-    id = Column(Integer, primary_key=True, index=True)
-    
-    # Campaign details
-    name = Column(String(200), nullable=False, index=True)
-    description = Column(Text, nullable=True)
-    campaign_type = Column(Enum(CampaignType), nullable=False, index=True)
-    status = Column(Enum(CampaignStatus), nullable=False, default=CampaignStatus.DRAFT)
-    
-    # Targeting
-    target_audience = Column(JSON, nullable=True)  # User segment criteria
-    target_user_ids = Column(JSON, nullable=True)  # Specific user list
-    exclude_user_ids = Column(JSON, nullable=True)  # Users to exclude
-    
-    # Email configuration
-    email_subject = Column(String(255), nullable=True)
-    email_template_name = Column(String(100), nullable=True)
-    email_template_data = Column(JSON, nullable=True)
-    send_email = Column(Boolean, default=False)
-    
-    # Token gifting configuration
-    gift_tokens = Column(Boolean, default=False)
-    token_type = Column(String(50), nullable=True)
-    token_amount = Column(Integer, nullable=True)
-    token_message = Column(String(500), nullable=True)
-    
-    # Scheduling
-    start_date = Column(DateTime, nullable=True)
-    end_date = Column(DateTime, nullable=True)
-    send_immediately = Column(Boolean, default=False)
-    recurring = Column(Boolean, default=False)
-    recurring_interval = Column(String(20), nullable=True)  # daily, weekly, monthly
-    
-    # Limits and controls
-    max_recipients = Column(Integer, nullable=True)
-    max_tokens_per_campaign = Column(Integer, nullable=True)
-    cooldown_hours = Column(Integer, default=24)  # Prevent spam
-    
-    # Tracking
-    recipients_count = Column(Integer, default=0)
-    emails_sent = Column(Integer, default=0)
-    emails_opened = Column(Integer, default=0)
-    emails_clicked = Column(Integer, default=0)
-    tokens_distributed = Column(Integer, default=0)
-    total_cost = Column(Float, default=0.0)
-    
-    # Admin
-    created_by = Column(Integer, ForeignKey('users.id'), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    executed_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    
-    # Relationships
-    creator = relationship("User", backref="created_campaigns")
+# Campaign model is imported from app.models.campaign
 
 
 class CampaignExecution(Base):

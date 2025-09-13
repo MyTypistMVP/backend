@@ -8,6 +8,15 @@ from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field, validator
 from enum import Enum
 
+class TimePeriod(str, Enum):
+    """Time period for analytics queries"""
+    HOUR = "hour"
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    QUARTER = "quarter"
+    YEAR = "year"
+
 class EventType(str, Enum):
     PAGE_VIEW = "page_view"
     TEMPLATE_INTERACTION = "template_interaction"

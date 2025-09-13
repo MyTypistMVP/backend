@@ -87,7 +87,7 @@ class RBACRole(Base):
     expires_at = Column(DateTime, nullable=True)  # Role expiration
 
     # Metadata
-    metadata = Column(Text, nullable=True)  # JSON metadata
+    role_metadata = Column(Text, nullable=True)  # JSON metadata
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -155,7 +155,7 @@ class UserRoleAssignment(Base):
 
     # Context
     assignment_reason = Column(String(255), nullable=True)
-    metadata = Column(Text, nullable=True)  # JSON metadata
+    assignment_metadata = Column(Text, nullable=True)  # JSON metadata
 
 
 class ResourceAccess(Base):
@@ -176,7 +176,7 @@ class ResourceAccess(Base):
 
     # Context
     access_reason = Column(String(255), nullable=True)
-    metadata = Column(Text, nullable=True)
+    access_metadata = Column(Text, nullable=True)
 
 
 class RBACService:

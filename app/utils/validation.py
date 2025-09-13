@@ -10,6 +10,29 @@ from fastapi import UploadFile, HTTPException, status
 import magic
 
 
+def validate_template_metadata(metadata: Dict[str, Any]) -> bool:
+    """Validate template metadata structure"""
+    try:
+        # Basic validation for template metadata
+        required_fields = ['name', 'description', 'category']
+        
+        for field in required_fields:
+            if field not in metadata:
+                return False
+                
+        # Validate field types
+        if not isinstance(metadata.get('name'), str):
+            return False
+        if not isinstance(metadata.get('description'), str):
+            return False
+        if not isinstance(metadata.get('category'), str):
+            return False
+            
+        return True
+    except Exception:
+        return False
+
+
 def validate_file_upload(
     file: UploadFile,
     allowed_extensions: List[str],

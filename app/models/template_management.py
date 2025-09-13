@@ -10,11 +10,11 @@ from sqlalchemy.orm import relationship
 from database import Base
 
 # Association table for template categories
-template_categories = Table(
-    'template_categories',
+template_category_links = Table(
+    'template_category_links',
     Base.metadata,
-    Column('template_id', Integer, ForeignKey('templates.id')),
-    Column('category_id', Integer, ForeignKey('template_categories.id'))
+    Column('template_id', Integer, ForeignKey('templates.id'), primary_key=True),
+    Column('category_id', Integer, ForeignKey('template_categories.id'), primary_key=True)
 )
 
 class TemplateCategory(Base):
@@ -32,9 +32,12 @@ class TemplateCategory(Base):
     
     # Relationships
     parent = relationship("TemplateCategory", remote_side=[id], backref="subcategories")
-    templates = relationship("Template", secondary=template_categories, back_populates="categories")
+    # templates relationship is defined in the Template model (app.models.template)
 
 
+class TemplateVersion(Base):
+    """Template version model for version control"""
+    __tablename__ = 'template_versions'
 
     id = Column(Integer, primary_key=True, index=True)
     template_id = Column(Integer, ForeignKey('templates.id'), nullable=False)
@@ -46,51 +49,14 @@ class TemplateCategory(Base):
     created_by = Column(Integer, ForeignKey('users.id'))
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
-    metadata = Column(JSON)  # Additional version-specific metadata
+    template_metadata = Column(JSON)  # Additional version-specific metadata
 
     # Relationships
-    template = relationship("Template", back_populates="versions")
+    template = relationship("Template")
     creator = relationship("User")
 
-class Template(Base):
-    """Enhanced template model with versioning and metadata support"""
-    __tablename__ = 'templates'
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    slug = Column(String, unique=True, nullable=False)
-    description = Column(String)
-    current_version = Column(String)  # Current active version number
-    preview_image_url = Column(String)
-    template_file_url = Column(String)
-    placeholder_schema = Column(JSON)  # Schema for template placeholders
-    metadata = Column(JSON)  # Template metadata (tags, requirements, etc)
-    is_public = Column(Boolean, default=True)
-    is_approved = Column(Boolean, default=False)
-    approval_status = Column(String)  # pending, approved, rejected
-    approval_notes = Column(String)
-    created_by = Column(Integer, ForeignKey('users.id'))
-    approved_by = Column(Integer, ForeignKey('users.id'), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    is_active = Column(Boolean, default=True)
-    
-    # Version tracking
-    first_version = Column(String)
-    latest_version = Column(String)
-    total_versions = Column(Integer, default=1)
-    
-    # Usage statistics
-    view_count = Column(Integer, default=0)
-    download_count = Column(Integer, default=0)
-    rating = Column(Integer)
-    review_count = Column(Integer, default=0)
-    
-    # Relationships
-    categories = relationship("TemplateCategory", secondary=template_categories, back_populates="templates")
-    versions = relationship("TemplateVersion", back_populates="template", cascade="all, delete-orphan")
-    creator = relationship("User", foreign_keys=[created_by])
-    approver = relationship("User", foreign_keys=[approved_by])
+# Note: Template model is defined in app.models.template
+# We use that model for consistency across the application
 
 class TemplateReview(Base):
     """User reviews and ratings for templates"""

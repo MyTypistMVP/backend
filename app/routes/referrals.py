@@ -2,7 +2,7 @@
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from app.database import get_db
+from database import get_db
 from app.services.auth_service import AuthService
 from app.services.referral_service import ReferralService
 from app.middleware.rate_limit import rate_limit

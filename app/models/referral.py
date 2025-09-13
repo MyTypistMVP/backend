@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from app.database import Base
+from database import Base
 
 
 class ReferralProgram(Base):
@@ -88,7 +88,7 @@ class ReferralTracking(Base):
     
     # Metadata
     notes = Column(Text, nullable=True)  # Any additional info
-    metadata = Column(JSON, nullable=True)  # Extensible data storage
+    referral_metadata = Column(JSON, nullable=True)  # Extensible data storage
     
     # Timestamps
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
