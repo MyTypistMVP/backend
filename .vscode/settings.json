@@ -32,10 +32,13 @@
     ],
     "[python]": {
         "editor.formatOnSave": true,
-        "editor.defaultFormatter": "ms-python.python",
+        "editor.defaultFormatter": null,
         "editor.codeActionsOnSave": {
-            "source.organizeImports": "explicit"
-        }
+            "source.organizeImports": "explicit",
+            "source.fixAll": "always"
+        },
+        "editor.formatOnPaste": true,
+        "editor.formatOnType": true
     },
 
     // Editor Settings
