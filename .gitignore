@@ -1,12 +1,22 @@
-__pycache__/
-.venv/
-/# Byte-compiled / optimized / DLL files
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
+*.pyd
 
 # C extensions
 *.so
+
+# Virtual environments & env files
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+.env
+.env*
 
 # Distribution / packaging
 build/
@@ -14,6 +24,7 @@ dist/
 eggs/
 *.egg-info/
 .eggs/
+pip-wheel-metadata/
 
 # Installer logs
 pip-log.txt
@@ -22,62 +33,31 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 .coverage
 .pytest_cache/
+coverage.xml
 htmlcov/
 
-# PyCharm
-.idea/
-
-# VS Code
+# IDEs / editors
 .vscode/
+.idea/
+.ropeproject
 
-# macOS files
-.DS_Store
+# Caches
+.mypy_cache/
+.cache/
 
-# Environment variables
-.env
-.venv
-env/
-ENV/
-
-# Python virtual environments
-venv/
-ENV/
-env.bak/
-
-# local data
-instance/
-
-# compiled static
-*.pyc
-
-# logs
+# Logs
 *.log
 
-# System files
-Thumbs.db
-/.venv/
-.env
-.env.*
-*.pyc
-*.pyo
-*.pyd
+# Databases / local data
 *.sqlite3
 *.db
 storage/*.db
 storage/*.sqlite
-venv/
-/.pytest_cache/
-.DS_Store
-.vscode/
-.idea/
-/.mypy_cache/
-pip-wheel-metadata/
-dist/
-build/
-coverage.xml
-htmlcov/
+instance/
+
+# Node
 node_modules/
-.ropeproject
-/.cache/
-/.venv/
-__pycache__/
+
+# OS files
+.DS_Store
+Thumbs.db

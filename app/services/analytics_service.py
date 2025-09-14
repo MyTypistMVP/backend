@@ -9,45 +9,53 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_
 from fastapi import Request
 
-from app.models.visit import Visit
 from app.models.document import Document
 from app.models.template import Template
 from app.models.user import User
+from app.models.analytics.visit import DocumentVisit, LandingVisit, PageVisit
+from app.services.analytics.visit_tracking import VisitTrackingService
 
 
 class AnalyticsService:
     """Analytics and tracking service"""
     
     @staticmethod
-    def track_visit(
+    def track_document_visit(
         db: Session,
         document_id: int,
         visit_type: str,
         request: Optional[Request] = None
-    ) -> Visit:
+    ) -> DocumentVisit:
         """Track a document visit"""
-        
-        # Extract visitor information
-        visitor_ip = None
-        visitor_user_agent = None
-        visitor_country = None
-        visitor_city = None
-        device_type = None
-        browser = None
-        os = None
-        
-        if request:
-            visitor_ip = AnalyticsService._get_client_ip(request)
-            visitor_user_agent = request.headers.get("user-agent")
+        try:
+            # Get request data
+            request_data = {}
+            if request:
+                request_data = {
+                    "ip_address": request.client.host if request.client else None,
+                    "user_agent": request.headers.get("user-agent"),
+                    "referrer": request.headers.get("referer")
+                }
             
-            # Parse user agent for device info
-            device_info = {"device_type": "Unknown", "browser": "Unknown", "os": "Unknown"}
-            device_type = device_info.get("device_type")
-            browser = device_info.get("browser")
-            os = device_info.get("os")
+            # Enrich visit data
+            visit_data = VisitTrackingService.enrich_visit_data(request_data)
             
-            # Get location from IP (would integrate with GeoIP service)
-            location = AnalyticsService._get_location_from_ip(visitor_ip)
+            # Create visit record
+            visit = DocumentVisit(
+                document_id=document_id,
+                visit_type=visit_type,
+                **visit_data
+            )
+            
+            db.add(visit)
+            db.commit()
+            db.refresh(visit)
+            
+            return visit
+            
+        except Exception as e:
+            logger.error(f"Failed to track document visit: {e}")
+            raise
             visitor_country = location.get("country")
             visitor_city = location.get("city")
         
@@ -74,9 +82,8 @@ class AnalyticsService:
         return visit
     
     @staticmethod
-    def process_visit_analytics(visits: List[Visit]) -> Dict[str, Any]:
-        """Process visit data into analytics insights"""
-        
+    def process_document_analytics(visits: List[DocumentVisit]) -> Dict[str, Any]:
+        """Process document visit analytics"""
         if not visits:
             return {
                 "total_visits": 0,
@@ -86,12 +93,13 @@ class AnalyticsService:
                 "browser_breakdown": {},
                 "country_breakdown": {},
                 "daily_visits": [],
-                "bounce_rate": 0
+                "bounce_rate": 0,
+                "average_time_reading": 0
             }
         
         # Basic metrics
         total_visits = len(visits)
-        unique_visitors = len(set(visit.visitor_ip for visit in visits if visit.visitor_ip))
+        unique_visitors = len(set(v.device_fingerprint for v in visits if v.device_fingerprint))
         
         # Visit types
         visit_types = {}
@@ -107,19 +115,19 @@ class AnalyticsService:
         # Browser breakdown
         browser_breakdown = {}
         for visit in visits:
-            if visit.browser:
-                browser_breakdown[visit.browser] = browser_breakdown.get(visit.browser, 0) + 1
+            if visit.browser_name:
+                browser_breakdown[visit.browser_name] = browser_breakdown.get(visit.browser_name, 0) + 1
         
         # Country breakdown
         country_breakdown = {}
         for visit in visits:
-            if visit.visitor_country:
-                country_breakdown[visit.visitor_country] = country_breakdown.get(visit.visitor_country, 0) + 1
+            if visit.country:
+                country_breakdown[visit.country] = country_breakdown.get(visit.country, 0) + 1
         
         # Daily visits
         daily_visits = {}
         for visit in visits:
-            date_key = visit.visited_at.date().isoformat()
+            date_key = visit.created_at.date().isoformat()
             daily_visits[date_key] = daily_visits.get(date_key, 0) + 1
         
         daily_visits_list = [
@@ -127,8 +135,12 @@ class AnalyticsService:
             for date, count in sorted(daily_visits.items())
         ]
         
-        # Calculate bounce rate (visits with duration < 30 seconds)
-        bounced_visits = len([visit for visit in visits if visit.bounce])
+        # Reading metrics
+        total_reading_time = sum(v.time_reading for v in visits if v.time_reading)
+        average_time_reading = total_reading_time / total_visits if total_visits > 0 else 0
+        
+        # Calculate bounce rate
+        bounced_visits = len([v for v in visits if v.bounce])
         bounce_rate = (bounced_visits / total_visits * 100) if total_visits > 0 else 0
         
         return {
@@ -139,7 +151,8 @@ class AnalyticsService:
             "browser_breakdown": browser_breakdown,
             "country_breakdown": country_breakdown,
             "daily_visits": daily_visits_list,
-            "bounce_rate": bounce_rate
+            "bounce_rate": bounce_rate,
+            "average_time_reading": average_time_reading
         }
     
     @staticmethod
@@ -164,26 +177,26 @@ class AnalyticsService:
         ).count()
         
         # Visit statistics
-        user_visits = db.query(Visit).join(Document).filter(Document.user_id == user_id)
+        user_visits = db.query(DocumentVisit).join(Document).filter(Document.user_id == user_id)
         
         total_visits = user_visits.count()
         visits_today = user_visits.filter(
-            func.date(Visit.visited_at) == today
+            func.date(DocumentVisit.created_at) == today
         ).count()
         visits_yesterday = user_visits.filter(
-            func.date(Visit.visited_at) == yesterday
+            func.date(DocumentVisit.created_at) == yesterday
         ).count()
         
         # Top documents
         top_documents = db.query(
             Document.id,
             Document.title,
-            func.count(Visit.id).label('visit_count')
+            func.count(DocumentVisit.id).label('visit_count')
         ).join(
-            Visit, Visit.document_id == Document.id
+            DocumentVisit, DocumentVisit.document_id == Document.id
         ).filter(
             Document.user_id == user_id,
-            Visit.visited_at >= last_30_days
+            DocumentVisit.created_at >= last_30_days
         ).group_by(
             Document.id, Document.title
         ).order_by(
@@ -246,13 +259,13 @@ class AnalyticsService:
         start_date = datetime.utcnow() - timedelta(days=days)
         
         # Build query
-        query = db.query(Visit).join(Document).filter(
+        query = db.query(DocumentVisit).join(Document).filter(
             Document.user_id == user_id,
-            Visit.visited_at >= start_date
+            DocumentVisit.created_at >= start_date
         )
         
         if document_id:
-            query = query.filter(Visit.document_id == document_id)
+            query = query.filter(DocumentVisit.document_id == document_id)
         
         visits = query.all()
         
@@ -264,12 +277,15 @@ class AnalyticsService:
                     "visit_id": visit.id,
                     "document_id": visit.document_id,
                     "visit_type": visit.visit_type,
-                    "visitor_country": visit.visitor_country,
-                    "visitor_city": visit.visitor_city,
+                    "country": visit.country,
+                    "city": visit.city,
                     "device_type": visit.device_type,
-                    "browser": visit.browser,
-                    "os": visit.os,
-                    "visited_at": visit.visited_at.isoformat()
+                    "browser_name": visit.browser_name,
+                    "os_name": visit.os_name,
+                    "created_at": visit.created_at.isoformat(),
+                    "time_reading": visit.time_reading,
+                    "bounce": visit.bounce,
+                    "device_fingerprint": visit.device_fingerprint
                 })
             
             return {
@@ -286,13 +302,18 @@ class AnalyticsService:
                     "document_id": visit.document_id,
                     "visit_type": visit.visit_type,
                     "visitor_info": {
-                        "country": visit.visitor_country,
-                        "city": visit.visitor_city,
+                        "country": visit.country,
+                        "city": visit.city,
                         "device_type": visit.device_type,
-                        "browser": visit.browser,
-                        "os": visit.os
+                        "browser": visit.browser_name,
+                        "os": visit.os_name,
+                        "device_fingerprint": visit.device_fingerprint
                     },
-                    "visited_at": visit.visited_at.isoformat(),
+                    "engagement": {
+                        "time_reading": visit.time_reading,
+                        "bounce": visit.bounce
+                    },
+                    "created_at": visit.created_at.isoformat(),
                     "metadata": visit.metadata
                 })
             
@@ -312,27 +333,27 @@ class AnalyticsService:
     ) -> int:
         """Anonymize analytics data for GDPR compliance"""
         
-        query = db.query(Visit).join(Document).filter(Document.user_id == user_id)
+        query = db.query(DocumentVisit).join(Document).filter(Document.user_id == user_id)
         
         if document_id:
-            query = query.filter(Visit.document_id == document_id)
+            query = query.filter(DocumentVisit.document_id == document_id)
         
         visits = query.all()
         anonymized_count = 0
         
         for visit in visits:
             # Anonymize IP address
-            if visit.visitor_ip:
-                visit.visitor_ip = "XXX.XXX.XXX.XXX"
+            if visit.ip_address:
+                visit.ip_address = "XXX.XXX.XXX.XXX"
             
             # Remove precise location data
-            visit.visitor_city = None
+            visit.city = None
             visit.latitude = None
             visit.longitude = None
             
-            # Anonymize user agent
-            if visit.visitor_user_agent:
-                visit.visitor_user_agent = "[ANONYMIZED]"
+            # Anonymize user agent and device fingerprint
+            visit.user_agent = "[ANONYMIZED]"
+            visit.device_fingerprint = "[ANONYMIZED]"
             
             # Clear metadata that might contain PII
             if visit.metadata:

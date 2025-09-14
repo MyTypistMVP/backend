@@ -2,7 +2,129 @@
 Template management and processing service
 """
 
-import os
+from typing import Dict, List, Optional, Any
+from datetime import datetime
+import logging
+from sqlalchemy.orm import Session
+
+from app.models.template import Template
+from app.services.batch_process_service import BatchProcessService
+from app.services.cache_service import CacheService
+from app.utils.monitoring import (
+    ACTIVE_TEMPLATE_OPERATIONS,
+    TEMPLATE_LOAD_TIME,
+    TEMPLATE_ERRORS
+)
+
+logger = logging.getLogger(__name__)
+
+def monitor_performance(operation_name: str):
+    """Decorator for monitoring template operations performance"""
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            ACTIVE_TEMPLATE_OPERATIONS.inc()
+            start_time = time.time()
+            try:
+                result = await func(*args, **kwargs)
+                TEMPLATE_LOAD_TIME.labels(
+                    method=operation_name,
+                    cache_status='hit' if result else 'miss'
+                ).observe(time.time() - start_time)
+                return result
+            except Exception as e:
+                TEMPLATE_ERRORS.labels(operation=operation_name).inc()
+                raise
+            finally:
+                ACTIVE_TEMPLATE_OPERATIONS.dec()
+        return wrapper
+    return decorator
+
+class TemplateLoader:
+    """Service for optimized template loading using BatchProcessService"""
+    
+    def __init__(self, batch_service: Optional[BatchProcessService] = None):
+        """Initialize loader with batch processing service"""
+        self.batch_service = batch_service or BatchProcessService(CacheService())
+        
+    @monitor_performance('load_single')
+    async def load_template(self, db: Session, template_id: int) -> Optional[Template]:
+        """Load a template with caching and performance monitoring"""
+        try:
+            # Use batch service to load and cache single template
+            results = await self.batch_service.preload_templates(db, [template_id])
+            return Template(**results[template_id]) if template_id in results else None
+        except Exception as e:
+            logger.error(f"Error loading template {template_id}: {str(e)}")
+            raise
+    
+    @monitor_performance('load_bulk')
+    async def load_templates_bulk(self, db: Session, template_ids: List[int], batch_size: int = 50) -> List[Template]:
+        """Load multiple templates efficiently using batch service"""
+        try:
+            # Use batch service to load and cache templates in batches
+            templates = []
+            
+            # Process in batches to avoid overwhelming the system
+            for i in range(0, len(template_ids), batch_size):
+                batch = template_ids[i:i + batch_size]
+                results = await self.batch_service.preload_templates(db, batch)
+                
+                for template_id in batch:
+                    if template_id in results:
+                        templates.append(Template(**results[template_id]))
+            
+            return templates
+        except Exception as e:
+            logger.error(f"Error loading templates in bulk: {str(e)}")
+            raise
+    
+    @monitor_performance('search')
+    async def search_templates(self, db: Session, query: str, filters: Dict[str, Any] = None) -> List[Template]:
+        """Search templates with caching"""
+        try:
+            # Use batch service to handle template search
+            results = await self.batch_service.search_templates(db, query, filters or {})
+            return [Template(**data) for data in results]
+        except Exception as e:
+            logger.error(f"Error searching templates: {str(e)}")
+            raise
+            
+    @monitor_performance('update')
+    async def update_template(self, db: Session, template_id: int, updates: Dict[str, Any]) -> Optional[Template]:
+        """Update template with proper cache invalidation"""
+        try:
+            # Update template using batch service
+            result = await self.batch_service.update_template(db, template_id, updates)
+            return Template(**result) if result else None
+        except Exception as e:
+            logger.error(f"Error updating template {template_id}: {str(e)}")
+            raise
+        for template_id in template_ids:
+            if template_id in results:
+                templates.append(Template(**results[template_id]))
+        
+        return templates
+    
+    @staticmethod
+    async def preload_templates(db: Session, category: str = None) -> bool:
+        """Preload frequently accessed templates into cache"""
+        try:
+            query = db.query(Template).filter(Template.is_active == True)
+            if category:
+                query = query.filter(Template.category == category)
+                
+            templates = query.order_by(desc(Template.usage_count)).limit(100).all()
+            template_ids = [t.id for t in templates]
+            
+            # Use batch service for preloading
+            batch_service = BatchProcessService(CacheService())
+            await batch_service.preload_templates(db, template_ids)
+            return True
+        except Exception as e:
+            logger.error(f"Template preload error: {e}")
+            return False
+
+class TemplateSimilarityService:mport os
 import uuid
 import hashlib
 import json
@@ -24,6 +146,10 @@ from app.models.template_management import TemplateCategory, TemplateReview
 from app.models.template_purchase import TemplatePurchase
 from app.models.template_favorite import TemplateFavorite
 from app.models.user import User
+import time
+import asyncio
+from prometheus_client import Counter, Histogram, Gauge
+from app.services.admin_service import AdminService
 from app.schemas.template import (
     TemplateCreate,
     TemplateUpdate,
@@ -48,6 +174,100 @@ redis_client = redis.Redis(
     port=settings.REDIS_PORT,
     decode_responses=True
 )
+
+# Performance metrics
+TEMPLATE_LOAD_TIME = Histogram(
+    'template_load_seconds',
+    'Time spent loading templates',
+    ['method', 'cache_status']
+)
+
+TEMPLATE_CACHE_HITS = Counter(
+    'template_cache_hits_total',
+    'Number of template cache hits'
+)
+
+TEMPLATE_CACHE_MISSES = Counter(
+    'template_cache_misses_total',
+    'Number of template cache misses'
+)
+
+TEMPLATE_ERRORS = Counter(
+    'template_errors_total',
+    'Number of template operation errors',
+    ['operation']
+)
+
+ACTIVE_TEMPLATE_OPERATIONS = Gauge(
+    'template_operations_active',
+    'Number of active template operations'
+)
+
+from app.services.cache_service import CacheService
+
+from app.services.batch_process_service import BatchProcessService
+
+class TemplateSimilarityService:
+    """Service for template similarity and recommendations"""
+    
+    @staticmethod
+    def find_similar_templates(db: Session, template_id: int, limit: int = 5) -> List[Template]:
+        """Find similar templates based on classification and similarity scores"""
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template or not template.similarity_score:
+            return []
+            
+        # Get similar template IDs sorted by similarity score
+        similar_ids = sorted(
+            [(int(tid), score) for tid, score in template.similarity_score.items()],
+            key=lambda x: x[1],
+            reverse=True
+        )[:limit]
+        
+        # Fetch similar templates
+        similar_templates = []
+        for tid, _ in similar_ids:
+            similar = db.query(Template).filter(Template.id == tid).first()
+            if similar and similar.is_active:
+                similar_templates.append(similar)
+                
+        return similar_templates
+    
+    @staticmethod
+    def get_cluster_templates(db: Session, template_id: int, limit: int = 5) -> List[Template]:
+        """Get templates from the same cluster"""
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template or template.cluster_id is None:
+            return []
+            
+        return db.query(Template).filter(
+            Template.cluster_id == template.cluster_id,
+            Template.id != template_id,
+            Template.is_active == True
+        ).limit(limit).all()
+    
+    @staticmethod
+    def search_by_keywords(db: Session, keywords: List[str], limit: int = 10) -> List[Template]:
+        """Search templates by keywords from their classification"""
+        templates = db.query(Template).filter(Template.is_active == True).all()
+        
+        # Score templates based on keyword matches
+        scored_templates = []
+        for template in templates:
+            if not template.keywords:
+                continue
+                
+            score = 0
+            template_keywords = [k[0].lower() for k in template.keywords]
+            for keyword in keywords:
+                if keyword.lower() in template_keywords:
+                    score += 1
+                    
+            if score > 0:
+                scored_templates.append((template, score))
+                
+        # Return top matching templates
+        return [t[0] for t in sorted(scored_templates, key=lambda x: x[1], reverse=True)[:limit]]
 
 logger = logging.getLogger(__name__)
 

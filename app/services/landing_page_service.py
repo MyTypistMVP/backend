@@ -9,88 +9,13 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float, desc, func
+from fastapi import Request
+
+from app.models.analytics.visit import LandingVisit
+from app.services.analytics.visit_tracking import VisitTrackingService
 from database import Base
 
 logger = logging.getLogger(__name__)
-
-
-class LandingPageVisit(Base):
-    """Enhanced tracking for landing page visits and conversions with real-time analytics"""
-    __tablename__ = "landing_page_visits"
-
-    id = Column(Integer, primary_key=True, index=True)
-
-    # Core visitor tracking
-    session_id = Column(String(100), nullable=False, index=True)
-    device_fingerprint = Column(String(64), nullable=True, index=True)
-    ip_address = Column(String(45), nullable=True)
-    user_agent = Column(Text, nullable=True)
-    
-    # Enhanced device info
-    browser_name = Column(String(100), nullable=True)
-    browser_version = Column(String(50), nullable=True)
-    os_name = Column(String(100), nullable=True)
-    os_version = Column(String(50), nullable=True)
-    device_type = Column(String(50), nullable=True)  # mobile, tablet, desktop
-    screen_resolution = Column(String(50), nullable=True)
-    
-    # Traffic source and campaign tracking
-    referrer = Column(String(500), nullable=True)
-    referrer_domain = Column(String(255), nullable=True, index=True)
-    utm_source = Column(String(100), nullable=True, index=True)
-    utm_medium = Column(String(100), nullable=True, index=True)
-    utm_campaign = Column(String(100), nullable=True, index=True)
-    utm_term = Column(String(100), nullable=True)
-    utm_content = Column(String(100), nullable=True)
-    
-    # Geo-location data
-    country = Column(String(2), nullable=True, index=True)
-    region = Column(String(100), nullable=True)
-    city = Column(String(100), nullable=True)
-    timezone = Column(String(50), nullable=True)
-
-    # Enhanced engagement tracking
-    entry_page = Column(String(500), nullable=True)  # First page visited
-    exit_page = Column(String(500), nullable=True)  # Last page before leaving
-    pages_viewed = Column(Text, nullable=True)  # JSON array of viewed pages with timestamps
-    scroll_depth = Column(Integer, default=0)  # Maximum scroll percentage
-    clicks_count = Column(Integer, default=0)  # Total click interactions
-    
-    # Template interaction tracking
-    viewed_templates = Column(Text, nullable=True)  # JSON array of {template_id, timestamp, view_duration}
-    searched_terms = Column(Text, nullable=True)  # JSON array of {term, timestamp, results_count}
-    template_interactions = Column(Text, nullable=True)  # JSON array of {template_id, action_type, timestamp}
-    
-    # Form interaction tracking
-    form_interactions = Column(Text, nullable=True)  # JSON array of {field_id, action, timestamp}
-    form_completion = Column(Float, default=0)  # Percentage of form completed
-    form_abandonment = Column(Boolean, default=False)  # Whether user abandoned form
-    last_interaction_field = Column(String(100), nullable=True)  # Last form field interacted with
-    
-    # Conversion funnel
-    funnel_stage = Column(String(50), nullable=True, index=True)  # Current stage in conversion funnel
-    created_document = Column(Boolean, default=False)
-    registered = Column(Boolean, default=False)
-    downloaded_document = Column(Boolean, default=False)
-    converted_to_paid = Column(Boolean, default=False)
-    
-    # Session metrics
-    time_on_page_seconds = Column(Integer, default=0)
-    templates_viewed_count = Column(Integer, default=0)
-    searches_performed = Column(Integer, default=0)
-    bounce = Column(Boolean, default=True)  # True if left without interaction
-    session_quality_score = Column(Float, default=0)  # Calculated engagement score
-    
-    # A/B testing
-    ab_test_group = Column(String(50), nullable=True, index=True)  # A/B test group assignment
-    ab_test_variant = Column(String(50), nullable=True)  # Specific variant shown
-    
-    # Timestamps and status
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    first_interaction_at = Column(DateTime, nullable=True)  # First meaningful interaction
-    last_interaction_at = Column(DateTime, nullable=True)  # Last meaningful interaction
-    converted_at = Column(DateTime, nullable=True)  # When they registered
-    session_end_at = Column(DateTime, nullable=True)  # When session ended
 
 
 class LandingPageTemplate(Base):
@@ -159,17 +84,14 @@ class LandingPageService:
     def track_landing_visit(
         db: Session,
         session_id: str,
-        device_fingerprint: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        referrer: Optional[str] = None,
+        request: Optional[Request] = None,
         utm_params: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """Track a new landing page visit"""
         try:
             # Check if visit already exists for this session
-            existing_visit = db.query(LandingPageVisit).filter(
-                LandingPageVisit.session_id == session_id
+            existing_visit = db.query(LandingVisit).filter(
+                LandingVisit.session_id == session_id
             ).first()
 
             if existing_visit:
@@ -179,18 +101,32 @@ class LandingPageService:
                     "existing_visit": True
                 }
 
-            # Create new visit record
-            utm_params = utm_params or {}
+            # Get request data
+            request_data = {}
+            if request:
+                request_data = {
+                    "ip_address": request.client.host if request.client else None,
+                    "user_agent": request.headers.get("user-agent"),
+                    "referrer": request.headers.get("referer")
+                }
 
-            visit = LandingPageVisit(
+            # Add UTM parameters if provided
+            if utm_params:
+                request_data.update({
+                    "utm_source": utm_params.get("utm_source"),
+                    "utm_medium": utm_params.get("utm_medium"),
+                    "utm_campaign": utm_params.get("utm_campaign"),
+                    "utm_term": utm_params.get("utm_term"),
+                    "utm_content": utm_params.get("utm_content")
+                })
+
+            # Use shared tracking service to enrich visit data
+            visit_data = VisitTrackingService.enrich_visit_data(request_data)
+            
+            # Create visit record with enriched data
+            visit = LandingVisit(
                 session_id=session_id,
-                device_fingerprint=device_fingerprint,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                referrer=referrer,
-                utm_source=utm_params.get("utm_source"),
-                utm_medium=utm_params.get("utm_medium"),
-                utm_campaign=utm_params.get("utm_campaign")
+                **visit_data
             )
 
             db.add(visit)
@@ -346,22 +282,27 @@ class LandingPageService:
     ) -> Dict[str, Any]:
         """Track when a user views a template preview"""
         try:
-            # Update landing page visit
-            visit = db.query(LandingPageVisit).filter(
-                LandingPageVisit.session_id == session_id
+            # Get landing page visit
+            visit = db.query(LandingVisit).filter(
+                LandingVisit.session_id == session_id
             ).first()
 
             if visit:
                 # Update viewed templates
-                viewed_templates = []
-                if visit.viewed_templates:
-                    try:
-                        viewed_templates = json.loads(visit.viewed_templates)
-                    except:
-                        pass
-
-                if template_id not in viewed_templates:
-                    viewed_templates.append(template_id)
+                current_interactions = visit.metadata.get("template_interactions", []) if visit.metadata else []
+                
+                # Add new template view
+                template_view = {
+                    "template_id": template_id,
+                    "action": "view",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                current_interactions.append(template_view)
+                
+                # Update visit metadata
+                visit.metadata = visit.metadata or {}
+                visit.metadata["template_interactions"] = current_interactions
+                visit.templates_viewed_count = (visit.templates_viewed_count or 0) + 1
                     visit.viewed_templates = json.dumps(viewed_templates)
                     visit.templates_viewed_count = len(viewed_templates)
                     db.commit()
@@ -449,13 +390,30 @@ class LandingPageService:
             if not draft_result["success"]:
                 return draft_result
 
-            # Track document creation start
-            visit = db.query(LandingPageVisit).filter(
-                LandingPageVisit.session_id == session_id
+            # Track document creation start in conversion funnel
+            visit = db.query(LandingVisit).filter(
+                LandingVisit.session_id == session_id
             ).first()
 
             if visit:
-                visit.created_document = True
+                # Update conversion funnel
+                visit.metadata = visit.metadata or {}
+                visit.metadata["funnel"] = visit.metadata.get("funnel", {})
+                visit.metadata["funnel"].update({
+                    "document_created": True,
+                    "document_created_at": datetime.utcnow().isoformat(),
+                    "template_id": template_id,
+                    "template_name": template.name
+                })
+                
+                # Update funnel metrics
+                visit.engagement_depth += 1
+                visit.bounce = False
+                visit.funnel_stage = "document_creation"
+                
+                # Calculate new conversion probability
+                visit.conversion_probability = LandingPageService._calculate_conversion_probability(visit)
+                
                 db.commit()
 
             logger.info(f"Free document creation initiated: draft {draft_result['draft_id']} for template {template_id}")
@@ -555,29 +513,45 @@ class LandingPageService:
                 draft.session_id = None  # Clear session since now belongs to user
                 db.commit()
 
-            # Update visit tracking
-            visit = db.query(LandingPageVisit).filter(
-                LandingPageVisit.session_id == session_id
+            # Update visit tracking with conversion
+            visit = db.query(LandingVisit).filter(
+                LandingVisit.session_id == session_id
             ).first()
 
             if visit:
-                visit.registered = True
-                visit.converted_at = datetime.utcnow()
+                # Update conversion funnel
+                visit.metadata = visit.metadata or {}
+                visit.metadata["funnel"] = visit.metadata.get("funnel", {})
+                visit.metadata["funnel"].update({
+                    "registered": True,
+                    "registered_at": datetime.utcnow().isoformat(),
+                    "user_id": user_id,
+                })
+                
+                # Update conversion metrics
+                visit.funnel_stage = "registered"
+                visit.engagement_depth += 1
+                visit.conversion_probability = 1.0  # Converted
+                
+                # Get list of viewed templates from interactions
+                template_interactions = visit.metadata.get("template_interactions", [])
+                viewed_template_ids = list(set(
+                    interaction["template_id"] 
+                    for interaction in template_interactions 
+                    if interaction["action"] == "view"
+                ))
+                
+                # Update template conversion stats
+                if viewed_template_ids:
+                    db.query(LandingPageTemplate).filter(
+                        LandingPageTemplate.template_id.in_(viewed_template_ids)
+                    ).update(
+                        {LandingPageTemplate.conversions_count: LandingPageTemplate.conversions_count + 1},
+                        synchronize_session=False
+                    )
+                    db.commit()
+                
                 db.commit()
-
-                # Update conversion stats for viewed templates
-                if visit.viewed_templates:
-                    try:
-                        viewed_template_ids = json.loads(visit.viewed_templates)
-                        db.query(LandingPageTemplate).filter(
-                            LandingPageTemplate.template_id.in_(viewed_template_ids)
-                        ).update(
-                            {LandingPageTemplate.conversions_count: LandingPageTemplate.conversions_count + 1},
-                            synchronize_session=False
-                        )
-                        db.commit()
-                    except:
-                        pass
 
             # Finalize free document for download
             from app.services.draft_system_service import DraftSystemService
@@ -615,24 +589,56 @@ class LandingPageService:
         try:
             start_date = datetime.utcnow() - timedelta(days=days)
 
-            # Basic metrics
-            total_visits = db.query(LandingPageVisit).filter(
-                LandingPageVisit.created_at >= start_date
-            ).count()
+            # Query all visits in period
+            visits = db.query(LandingVisit).filter(
+                LandingVisit.created_at >= start_date
+            ).all()
 
-            conversions = db.query(LandingPageVisit).filter(
-                LandingPageVisit.created_at >= start_date,
-                LandingPageVisit.registered == True
-            ).count()
+            # Process visits
+            total_visits = len(visits)
+            conversions = 0
+            document_creations = 0
+            bounce_count = 0
+            total_engagement_time = 0
+            funnel_stages = {
+                "viewed": 0,
+                "template_view": 0,
+                "document_creation": 0,
+                "registered": 0
+            }
 
-            document_creations = db.query(LandingPageVisit).filter(
-                LandingPageVisit.created_at >= start_date,
-                LandingPageVisit.created_document == True
-            ).count()
+            for visit in visits:
+                # Check funnel stages from metadata
+                funnel_data = visit.metadata.get("funnel", {}) if visit.metadata else {}
+                
+                # Count conversions (registrations)
+                if visit.funnel_stage == "registered":
+                    conversions += 1
+                
+                # Count document creations
+                if funnel_data.get("document_created"):
+                    document_creations += 1
+                
+                # Count bounces and engagement
+                if visit.bounce:
+                    bounce_count += 1
+                if visit.time_on_page_seconds:
+                    total_engagement_time += visit.time_on_page_seconds
+                
+                # Track funnel stages
+                funnel_stages["viewed"] += 1
+                if visit.templates_viewed_count and visit.templates_viewed_count > 0:
+                    funnel_stages["template_view"] += 1
+                if visit.funnel_stage == "document_creation":
+                    funnel_stages["document_creation"] += 1
+                if visit.funnel_stage == "registered":
+                    funnel_stages["registered"] += 1
 
-            # Conversion rates
-            conversion_rate = (conversions / max(total_visits, 1)) * 100
-            document_creation_rate = (document_creations / max(total_visits, 1)) * 100
+            # Calculate rates
+            conversion_rate = (conversions / total_visits * 100) if total_visits > 0 else 0
+            document_creation_rate = (document_creations / total_visits * 100) if total_visits > 0 else 0
+            bounce_rate = (bounce_count / total_visits * 100) if total_visits > 0 else 0
+            avg_engagement_time = (total_engagement_time / total_visits) if total_visits > 0 else 0
 
             # Top performing templates
             top_templates = db.query(

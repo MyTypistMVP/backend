@@ -98,6 +98,185 @@ class CacheService:
 
             # Compress if data is large enough
             if len(json_data) > self.compression_threshold:
+                return gzip.compress(json_data)
+            return json_data
+        except Exception as e:
+            cache_logger.error(f"Serialization error: {e}")
+            return None
+
+    def _deserialize_data(self, data: bytes) -> Any:
+        """Deserialize and decompress data"""
+        try:
+            # Check if data is compressed
+            if data.startswith(b'\x1f\x8b'):  # gzip magic number
+                data = gzip.decompress(data)
+            return json.loads(data.decode('utf-8'))
+        except Exception as e:
+            cache_logger.error(f"Deserialization error: {e}")
+            return None
+
+    async def cache_template(self, template: Any, ttl: int = None) -> bool:
+        """Cache a template with metadata"""
+        try:
+            cache_key = f"{self.config.key_prefix}template:{template.id}:v{template.version}"
+            template_data = {
+                "id": template.id,
+                "name": template.name,
+                "content": template.content,
+                "version": template.version,
+                "placeholders": template.placeholders,
+                "metadata": {
+                    "category": template.category,
+                    "type": template.type,
+                    "language": template.language,
+                    "is_premium": template.is_premium,
+                    "price": template.price
+                }
+            }
+            serialized = self._serialize_data(template_data)
+            if not serialized:
+                return False
+                
+            await self.redis.setex(
+                cache_key,
+                ttl or self.config.default_ttl,
+                serialized
+            )
+            
+            # Track template dependencies
+            await self.track_dependencies([cache_key], [f"template:{template.id}"])
+            return True
+            
+        except Exception as e:
+            cache_logger.error(f"Template cache error: {e}")
+            return False
+
+    async def get_cached_template(self, template_id: int, version: str = None) -> Optional[dict]:
+        """Get template from cache with versioning support"""
+        try:
+            pattern = f"{self.config.key_prefix}template:{template_id}"
+            if version:
+                pattern += f":v{version}"
+            else:
+                pattern += ":v*"
+                
+            keys = await self.redis.keys(pattern)
+            if not keys:
+                return None
+                
+            # Get latest version if no specific version requested
+            key = keys[-1] if not version else keys[0]
+            raw_data = await self.redis.get(key)
+            if not raw_data:
+                return None
+                
+            return self._deserialize_data(raw_data)
+            
+        except Exception as e:
+            cache_logger.error(f"Template cache get error: {e}")
+            return None
+            
+    async def invalidate_template(self, template_id: int) -> bool:
+        """Invalidate all versions of a template"""
+        try:
+            # Invalidate by dependency
+            await self.invalidate_by_tag(f"template:{template_id}")
+            return True
+        except Exception as e:
+            cache_logger.error(f"Template cache invalidation error: {e}")
+            return False
+            
+    async def bulk_cache_templates(self, templates: List[Any], ttl: int = None) -> bool:
+        """Cache multiple templates efficiently"""
+        try:
+            pipe = self.redis.pipeline()
+            dependencies = []
+            
+            for template in templates:
+                cache_key = f"{self.config.key_prefix}template:{template.id}:v{template.version}"
+                dependencies.append((cache_key, f"template:{template.id}"))
+                
+                template_data = {
+                    "id": template.id,
+                    "name": template.name,
+                    "content": template.content,
+                    "version": template.version,
+                    "placeholders": template.placeholders,
+                    "metadata": {
+                        "category": template.category,
+                        "type": template.type,
+                        "language": template.language,
+                        "is_premium": template.is_premium,
+                        "price": template.price
+                    }
+                }
+                
+                serialized = self._serialize_data(template_data)
+                if serialized:
+                    pipe.setex(
+                        cache_key,
+                        ttl or self.config.default_ttl,
+                        serialized
+                    )
+                    
+            # Execute all cache operations
+            await pipe.execute()
+            
+            # Track all dependencies
+            for key, tag in dependencies:
+                await self.track_dependencies([key], [tag])
+                
+            return True
+            
+        except Exception as e:
+            cache_logger.error(f"Bulk template cache error: {e}")
+            return False
+
+    async def track_dependencies(self, keys: List[str], tags: List[str]) -> bool:
+        """Track cache key dependencies for invalidation"""
+        try:
+            # Store key -> tag mapping
+            for key in keys:
+                self.cache_dependencies[key] = tags
+                
+            # Store tag -> key mapping
+            for tag in tags:
+                if tag not in self.cache_tags:
+                    self.cache_tags[tag] = []
+                self.cache_tags[tag].extend(keys)
+                
+            return True
+        except Exception as e:
+            cache_logger.error(f"Error tracking dependencies: {e}")
+            return False
+
+    async def invalidate_by_tag(self, tag: str) -> bool:
+        """Invalidate all cache entries with the given tag"""
+        try:
+            if tag not in self.cache_tags:
+                return True
+                
+            # Get all keys for this tag
+            keys = self.cache_tags[tag]
+            if not keys:
+                return True
+                
+            # Delete all keys
+            await self.redis.delete(*keys)
+            
+            # Clean up tracking
+            del self.cache_tags[tag]
+            for key in keys:
+                if key in self.cache_dependencies:
+                    del self.cache_dependencies[key]
+                    
+            return True
+        except Exception as e:
+            cache_logger.error(f"Error invalidating by tag: {e}")
+            return False
+            
+            # Compress if data is large enough
+            if len(json_data) > self.compression_threshold:
                 compressed = gzip.compress(json_data)
                 # Mark as compressed with prefix
                 return b'GZIP:' + compressed

@@ -30,6 +30,13 @@ class TemplateCategory(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True)
     
+    # Enhanced classification fields
+    keywords = Column(JSON, default=list)  # TF-IDF extracted keywords
+    feature_vector = Column(JSON, default=list)  # Numeric feature vector for clustering
+    cluster_id = Column(Integer, nullable=True)  # Assigned cluster
+    similarity_score = Column(JSON, default=dict)  # Similarity scores with other templates
+    auto_tags = Column(JSON, default=list)  # Automatically generated tags
+    
     # Relationships
     parent = relationship("TemplateCategory", remote_side=[id], backref="subcategories")
     # templates relationship is defined in the Template model (app.models.template)

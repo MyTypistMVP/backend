@@ -696,8 +696,23 @@ async def track_page_visit(
         user_agent = request.headers.get("user-agent")
         referrer = request.headers.get("referer")
 
-        result = AdminDashboardService.track_page_visit(
+        # Get request data for shared tracking
+        request_data = {
+            "ip_address": client_ip,
+            "user_agent": user_agent,
+            "referrer": referrer
+        }
+        
+        if device_info:
+            request_data.update(device_info)
+        
+        result = await AdminDashboardService.track_page_visit(
             db=db,
+            page_path=page_path,
+            user_id=user_id,
+            session_id=session_id,
+            request=request,
+            request_data=request_data
             page_path=page_path,
             user_id=user_id,
             session_id=session_id,

@@ -10,10 +10,10 @@ from sqlalchemy import func, desc, and_
 
 from database import get_db
 from config import settings
-from app.models.visit import Visit
 from app.models.document import Document
 from app.models.user import User
-from app.services.analytics_service import AnalyticsService
+from app.models.analytics.visit import DocumentVisit, PageVisit
+from app.services.analytics.visit_tracking import VisitTrackingService
 from app.services.audit_service import AuditService
 from app.services.performance_service import PerformanceService
 from app.schemas.analytics import TimePeriod
@@ -23,7 +23,7 @@ router = APIRouter()
 
 
 @router.post("/track")
-async def track_visit(
+async def track_document_visit(
     document_id: int,
     visit_type: str = "view",
     request: Request = None,
@@ -40,12 +40,21 @@ async def track_visit(
             detail="Document not found"
         )
     
-    # Create visit record
-    visit = AnalyticsService.track_visit(db, document_id, visit_type, request)
+    # Create visit record using shared tracking service
+    visit_tracking = VisitTrackingService()
+    visit = visit_tracking.track_document_visit(db, document_id, visit_type, request)
     
+    # Return visit metrics
     return {
+        "success": True,
         "message": "Visit tracked successfully",
-        "visit_id": visit.id
+        "visit_id": visit.id,
+        "visit_metrics": {
+            "time_reading": visit.time_reading if visit.time_reading else 0,
+            "bounce": visit.bounce,
+            "session_id": visit.session_id,
+            "created_at": visit.created_at.isoformat()
+        }
     }
 
 
@@ -163,7 +172,8 @@ async def get_visit_analytics(
     visits = query.order_by(desc(Visit.visited_at)).all()
     
     # Process analytics data
-    analytics_data = AnalyticsService.process_visit_analytics(visits)
+    visit_tracking = VisitTrackingService()
+    analytics_data = visit_tracking.process_document_analytics(visits)
     
     return analytics_data
 
@@ -175,7 +185,8 @@ async def get_analytics_dashboard_data(
 ):
     """Get comprehensive analytics dashboard data"""
     
-    dashboard_data = AnalyticsService.get_dashboard_analytics(db, current_user.id)
+    visit_tracking = VisitTrackingService()
+    dashboard_data = visit_tracking.get_dashboard_analytics(db, current_user.id)
     
     return dashboard_data
 
@@ -464,7 +475,8 @@ async def export_analytics(
         )
     
     # Get analytics data
-    analytics_data = AnalyticsService.export_analytics_data(
+    visit_tracking = VisitTrackingService()
+    analytics_data = visit_tracking.export_analytics_data(
         db, current_user.id, document_id, days, format
     )
     
@@ -530,7 +542,8 @@ async def anonymize_analytics_data(
 ):
     """Anonymize analytics data (GDPR compliance)"""
     
-    anonymized_count = AnalyticsService.anonymize_user_analytics(
+    visit_tracking = VisitTrackingService()
+    anonymized_count = visit_tracking.anonymize_user_analytics(
         db, current_user.id, document_id
     )
     

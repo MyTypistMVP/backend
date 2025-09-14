@@ -32,19 +32,81 @@ class RealtimeAnalyticsService:
         event_data: Dict[str, Any],
         timestamp: Optional[datetime] = None
     ) -> Dict[str, Any]:
-        """Track real-time user interaction with rate limiting and validation"""
+        """Track real-time user interaction with enhanced analytics"""
         try:
-            # Rate limiting
+            # Rate limiting with adaptive thresholds
             rate_limit_key = f"{RealtimeAnalyticsService.RATE_LIMIT_PREFIX}:{session_id}"
             if not RealtimeAnalyticsService._check_rate_limit(rate_limit_key):
                 logger.warning(f"Rate limit exceeded for session {session_id}")
                 return {"success": False, "error": "rate_limit_exceeded"}
+                
+            # Enhanced session tracking
+            now = timestamp or datetime.utcnow()
+            visit = db.query(LandingPageVisit).filter(
+                LandingPageVisit.session_id == session_id
+            ).first()
+            
+            if visit:
+                # Update engagement metrics
+                visit.active_time_seconds = RealtimeAnalyticsService._calculate_active_time(
+                    visit.active_time_seconds,
+                    visit.last_interaction_at,
+                    now
+                )
+                
+                # Update bounce classification
+                visit.bounce = False
+                visit.bounce_type = RealtimeAnalyticsService._classify_bounce_type(
+                    visit.created_at,
+                    now,
+                    visit.engagement_depth
+                )
+                
+                # Calculate conversion probability
+                visit.conversion_probability = RealtimeAnalyticsService._calculate_conversion_probability(
+                    visit.engagement_depth,
+                    visit.session_quality_score,
+                    visit.template_interactions
+                )
 
             # Validate and sanitize
             sanitized_data = sanitize_user_input(event_data)
             validation_result = validate_analytics_data(sanitized_data)
             if not validation_result["valid"]:
                 return {"success": False, "error": "invalid_data"}
+
+            @staticmethod
+            def _calculate_active_time(current_active_time: int, last_interaction: datetime, current_time: datetime) -> int:
+                """Calculate active time based on interaction gaps"""
+                if not last_interaction:
+                    return current_active_time
+                gap = (current_time - last_interaction).total_seconds()
+                if gap < 300:  # Consider gaps less than 5 minutes as active time
+                    return current_active_time + int(gap)
+                return current_active_time
+
+            @staticmethod
+            def _classify_bounce_type(created_at: datetime, current_time: datetime, engagement_depth: int) -> str:
+                """Classify bounce type based on session duration and engagement"""
+                duration = (current_time - created_at).total_seconds()
+                if duration < 10:
+                    return "quick"
+                elif duration < 30 and engagement_depth < 2:
+                    return "normal"
+                return "delayed"
+
+            @staticmethod
+            def _calculate_conversion_probability(engagement_depth: int, quality_score: float, interactions: str) -> float:
+                """Calculate probability of conversion using engagement metrics"""
+                base_score = min(quality_score * 0.4 + engagement_depth * 0.3, 1.0)
+                
+                if not interactions:
+                    return base_score
+                    
+                interaction_data = json.loads(interactions)
+                interaction_score = min(len(interaction_data) * 0.1, 0.3)
+                
+                return min(base_score + interaction_score, 1.0)
 
             # Get visit record
             visit = db.query(LandingPageVisit).filter(

@@ -17,12 +17,143 @@ from app.models.document import Document, DocumentStatus
 from app.models.payment import Payment, Subscription, PaymentStatus, SubscriptionStatus
 from app.models.audit import AuditLog, AuditLevel
 import logging
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import MiniBatchKMeans
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 
 class AdminService:
     """Administrative service for system management"""
+    
+    @staticmethod
+    def _extract_template_features(template_text: str) -> tuple:
+        """Extract TF-IDF features from template text"""
+        vectorizer = TfidfVectorizer(
+            max_features=100,
+            stop_words='english',
+            ngram_range=(1, 2)
+        )
+        features = vectorizer.fit_transform([template_text])
+        keywords = [(word, score) for word, score in 
+                   zip(vectorizer.get_feature_names_out(),
+                       features.toarray()[0]) if score > 0]
+        return features, keywords
+
+    @staticmethod
+    def _cluster_templates(features, n_clusters=10):
+        """Cluster templates using MiniBatchKMeans"""
+        clustering = MiniBatchKMeans(
+            n_clusters=n_clusters,
+            random_state=42
+        )
+        return clustering.fit_predict(features)
+
+    @staticmethod
+    def _calculate_similarity(features) -> dict:
+        """Calculate similarity scores between templates"""
+        similarity_matrix = cosine_similarity(features)
+        return {i: sorted(enumerate(sim_scores), key=lambda x: x[1], reverse=True)[1:6]
+                for i, sim_scores in enumerate(similarity_matrix)}
+
+    @staticmethod
+    def update_template_classifications(db: Session):
+        """Update template classifications and similarities"""
+        templates = db.query(Template).filter(Template.is_active == True).all()
+        
+        # Extract features
+        all_texts = [t.content for t in templates]
+        all_features = []
+        
+        for i, template in enumerate(templates):
+            features, keywords = AdminService._extract_template_features(template.content)
+            template.keywords = keywords
+            template.feature_vector = features.toarray()[0].tolist()
+            all_features.append(features)
+        
+        # Combine features
+        combined_features = np.vstack([f.toarray() for f in all_features])
+        
+        # Cluster templates
+        clusters = AdminService._cluster_templates(combined_features)
+        for template, cluster_id in zip(templates, clusters):
+            template.cluster_id = int(cluster_id)
+        
+        # Calculate similarities
+        similarity_scores = AdminService._calculate_similarity(combined_features)
+        for i, template in enumerate(templates):
+            template.similarity_score = {
+                str(templates[idx].id): float(score)
+                for idx, score in similarity_scores[i]
+            }
+        
+        db.commit()
+        
+    @staticmethod
+    def recalculate_classifications(db: Session) -> dict:
+        """Recalculate all template classifications"""
+        try:
+            AdminService.update_template_classifications(db)
+            return {"success": True, "message": "Template classifications updated"}
+        except Exception as e:
+            logger.error(f"Failed to update template classifications: {e}")
+            return {"success": False, "error": str(e)}
+            
+    @staticmethod
+    def get_cluster_details(db: Session, cluster_id: int) -> dict:
+        """Get detailed information about a specific cluster"""
+        templates = db.query(Template).filter(
+            Template.cluster_id == cluster_id,
+            Template.is_active == True
+        ).all()
+        
+        # Get common keywords in cluster
+        all_keywords = []
+        for template in templates:
+            if template.keywords:
+                all_keywords.extend(template.keywords)
+                
+        keyword_counts = {}
+        for keyword, score in all_keywords:
+            keyword_counts[keyword] = keyword_counts.get(keyword, 0) + 1
+            
+        return {
+            "cluster_id": cluster_id,
+            "template_count": len(templates),
+            "common_keywords": sorted(keyword_counts.items(), key=lambda x: x[1], reverse=True)[:10],
+            "templates": [{"id": t.id, "name": t.name} for t in templates]
+        }
+            
+    @staticmethod
+    def _get_template_classification_stats(db: Session) -> dict:
+        """Get template classification statistics"""
+        templates = db.query(Template).filter(Template.is_active == True).all()
+        
+        # Count templates per cluster
+        cluster_counts = {}
+        for template in templates:
+            if template.cluster_id is not None:
+                cluster_counts[template.cluster_id] = cluster_counts.get(template.cluster_id, 0) + 1
+        
+        # Get most common keywords
+        all_keywords = []
+        for template in templates:
+            if template.keywords:
+                all_keywords.extend(template.keywords)
+        
+        keyword_counts = {}
+        for keyword, score in all_keywords:
+            keyword_counts[keyword] = keyword_counts.get(keyword, 0) + 1
+        
+        top_keywords = sorted(keyword_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        return {
+            "clusters": cluster_counts,
+            "top_keywords": top_keywords,
+            "classified_count": len([t for t in templates if t.keywords])
+        }
     
     @staticmethod
     def get_dashboard_stats(db: Session) -> Dict[str, Any]:
@@ -78,6 +209,8 @@ class AdminService:
         # Storage usage
         storage_usage = AdminService.get_storage_usage()
         
+        template_stats = AdminService._get_template_classification_stats(db)
+        
         return {
             "users": {
                 "total": total_users,
@@ -95,7 +228,14 @@ class AdminService:
             "templates": {
                 "total": total_templates,
                 "public": public_templates,
-                "private": total_templates - public_templates
+                "private": total_templates - public_templates,
+                "classification": template_stats,
+                "clusters": {
+                    "total_clusters": len(template_stats.get("clusters", {})),
+                    "distribution": template_stats.get("clusters", {}),
+                    "top_keywords": template_stats.get("top_keywords", []),
+                    "classified_percent": (template_stats.get("classified_count", 0) / total_templates * 100) if total_templates > 0 else 0
+                }
             },
             "revenue": {
                 "total": float(total_revenue),

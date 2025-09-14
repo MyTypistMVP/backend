@@ -95,9 +95,13 @@ async def track_landing_visit(
             "utm_campaign": track_request.utm_campaign
         }
 
+        utm_params = {k: v for k, v in utm_params.items() if v is not None}
+        
         result = LandingPageService.track_landing_visit(
             db=db,
             session_id=session_info["session_id"],
+            request=request,
+            utm_params=utm_params if utm_params else None
             device_fingerprint=session_info["device_fingerprint"],
             ip_address=session_info["ip_address"],
             user_agent=session_info["user_agent"],
@@ -333,7 +337,9 @@ async def create_free_document(
             db=db,
             template_id=template_id,
             session_id=session_info["session_id"],
-            device_fingerprint=session_info["device_fingerprint"]
+            ip_address=session_info["ip_address"],
+            device_fingerprint=session_info["device_fingerprint"],
+            user_agent=session_info["user_agent"]
         )
 
         return result
@@ -363,11 +369,18 @@ async def complete_guest_registration(
             "phone_number": registration_request.phone_number
         }
 
+        device_info = {
+            "device_fingerprint": session_info["device_fingerprint"],
+            "ip_address": session_info["ip_address"],
+            "user_agent": session_info["user_agent"]
+        }
+
         result = LandingPageService.complete_guest_registration(
             db=db,
             draft_id=registration_request.draft_id,
             session_id=session_info["session_id"],
-            user_data=user_data
+            user_data=user_data,
+            device_info=device_info
         )
 
         if result["success"]:

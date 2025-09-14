@@ -16,7 +16,7 @@ from database import Base
 from app.models.template import Template
 from app.models.document import Document
 from app.models.user import User
-from app.services.analytics_service import AnalyticsService
+from app.services.analytics.visit_tracking import VisitTrackingService
 
 
 class SearchQuery(Base):

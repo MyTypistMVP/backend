@@ -48,7 +48,6 @@ MyTypist (mytypist.net) is a comprehensive document automation SaaS platform for
 - Template Management
   - Template creation and editing
   - Category management
-  - Version control
   - Preview generation
 - Template Marketplace
   - Pricing controls
@@ -89,151 +88,11 @@ MyTypist (mytypist.net) is a comprehensive document automation SaaS platform for
   - Performance tracking
   - Analytics dashboard
 
-## Current Development Status
-
-### 1. Landing Page & Guest Document Generation
-- [x] Template Search & Preview
-  - [x] Real-time search with autocomplete (enhanced with caching)
-  - [x] Preview templates without login (secure watermarked PDFs)
-  - [x] Popular/recent templates display (with analytics)
-  - [x] SEO-optimized template pages (meta tags, OpenGraph)
-
-- [x] Guest Document Creation
-  - [x] Create document without login (with fraud prevention)
-  - [x] Auto-save inputs for suggestions (with smart validation)
-  - [x] Live preview as user types (with responsive thumbnails)
-  - [x] Registration prompt for download (with security checks)
-  - [x] Auto-link document to new user account (with enhanced tracking)
-
-### 2. Template Management & Preview
-- [x] Admin Template Management
-  - [x] Upload preview & extraction files
-  - [x] Set metadata (title, desc, tags)
-  - [x] Manage categories and groups
-  - [x] Version control & history
-
-- [x] Pricing Controls
-  - [x] Set individual template prices
-  - [x] Bulk pricing updates
-  - [x] Category/tag-based pricing
-  - [x] Special offers/discounts
-
-- [x] User Template Submissions
-  - [x] Submit templates for review
-  - [x] Admin approval workflow
-  - [x] Public/private settings
-  - [x] Usage tracking & revenue sharing
-
-### 3. Admin Dashboard & Analytics
-- [x] Real-time Statistics
-  - [x] User metrics (active, new, total)
-  - [x] Document metrics (created, downloaded)
-  - [x] Revenue tracking
-  - [x] Visit analytics (per page, duration)
-
-- [x] Data Management
-  - [x] Export data (CSV, PDF, Excel)
-  - [x] Visualization APIs for charts
-  - [x] Custom date ranges
-  - [x] Trend analysis
-
-- [x] Audit System
-  - [x] Complete activity logs with advanced threat detection
-    - [x] SQL injection detection
-    - [x] XSS attack detection
-    - [x] Rate limiting patterns
-    - [x] Suspicious IP tracking
-    - [x] Unusual behavior detection
-    - [x] Account takeover prevention
-  - [x] Security audit trail
-    - [x] Detailed incident tracking
-    - [x] Geographic data
-    - [x] Attack pattern analysis
-    - [x] Evidence collection
-  - [x] Admin action tracking
-    - [x] Response time monitoring
-    - [x] Resolution tracking
-    - [x] Investigation notes
-    - [x] Mitigation steps
-  - [x] Data compliance reports
-    - [x] Incident summaries
-    - [x] Pattern analysis
-    - [x] Response metrics
-    - [x] Geographic data analysis
-
-### 4. User & Role Management
-- [x] Role-Based Access Control
-  - [x] Admin (full access)
-  - [x] Moderator (limited access)
-  - [x] User (standard access)
-  - [x] Guest (preview access)
-
-- [x] User Management
-  - [x] Create/edit/suspend users (implemented in admin.py)
-  - [x] Bulk actions (implemented in admin.py)
-  - [x] Plan assignment (implemented in admin.py)
-  - [x] Usage monitoring (implemented in admin.py)
-
-- [x] Moderator System
-  - [x] Create moderator accounts (implemented in moderator_management.py)
-  - [x] Define permissions (implemented in role_management.py)
-  - [x] Activity tracking (implemented with AuditService)
-  - [x] Support tools (integrated with SupportTicketService)
-
-### 5. Document Sharing & Version Control
-- [x] Public Document Sharing
-  - [x] SEO-optimized public document links
-  - [x] No authentication required for viewing
-  - [x] Original view for downloaded documents (no watermark)
-  - [x] Watermarked previews for public templates
-  - [x] View tracking and analytics
-    - [x] Total views and unique visitors
-    - [x] Traffic sources and referrers
-    - [x] Geographic data and device info
-    - [x] GDPR-compliant tracking
-  - [x] Conversion tracking (views to downloads)
- 
-
-### 6. SEO & Social Integration
-- [x] SEO Optimization
-  - [x] Meta tags generation (implemented in SEOService)
-  - [x] OpenGraph data (dynamic generation based on content)
-  - [x] Canonical URLs (middleware and URL service)
-  - [x] Sitemap generation (XML sitemap with priority)
-
-- [x] Social Sharing
-  - [x] Share previews (dynamic image generation)
-  - [x] Social media cards (custom preview for each platform)
-  - [x] Engagement tracking (comprehensive analytics)
-  - [x] Viral sharing features (QR codes and tracking)
-
-### 7. Referal
+## Current Development Status (Todo)
 
 
 
-- [ ] Partnership System
-  - [x] Partner applications
-  - [x] Revenue sharing
-  - [x] Performance tracking
-  - [x] Partner dashboard
 
-### 8. Advanced Features
-- [x] Notifications
-  - [x] In-app notifications
-  - [x] Email notifications
-  - [x] Custom preferences
-
-- [x] Token System
-  - [x] Token purchase
-  - [x] Usage tracking
-  - [x] Auto-renewal
-  - [x] Balance alerts
-
-- [x] Performance
-  - [x] Response time < 500ms
-  - [x] Caching strategy
-  - [x] Load balancing
-  - [x] Auto-scaling
 
 ## User Preferences
 
@@ -243,17 +102,13 @@ CRITICAL: Never duplicate existing code or create new files that replicate funct
 
 The agent should continuously read and analyze the entire codebase to detect changes. When changes are identified, the agent should analyze the existing code patterns, architectural decisions, coding style, and implementation approaches. It should think exactly like the original developer, ensuring that any modifications strictly follow the established coding patterns and practices already present in the codebase. It should not introduce new coding approaches, patterns, or styles that deviate from what has already been implemented, and if a deviation is needed, it should ask for permission.
 
-The agent must thoroughly analyze the existing codebase before making any changes to understand the established patterns. It must pay attention to naming conventions, error handling approaches, data structure usage, and architectural patterns already in use. It must consider the existing code organization, module structure, and dependency management approaches. It must evaluate the current testing patterns, logging approaches, and configuration management styles. It should only update files when there is a clear necessity, not for cosmetic or preference-based changes. It should update the context of this file after each feature completion and update this replit.md file when new patterns or rules are discovered during development. It must follow DRY (Don't Repeat Yourself) principles – eliminating duplicate code, commits, and object instantiation. It must ensure database migrations match model declarations (column names, nullable fields, foreign keys) and proactively check and update related files when making changes – not waiting to be told. After every feature completion, it should analyze and remove unused imports and dead code. It should provide a concise summary after each feature: group methods/functions under each file created/modified, with a one-sentence purpose. It must update the Application Summary section at the end of this file when new features or major functionality are implemented. The agent's life depends on maintaining absolute consistency with the existing codebase patterns and never introducing foreign coding approaches that conflict with the established development style.
+The agent must thoroughly analyze the existing codebase before making any changes to understand the established patterns. It must pay attention to naming conventions, error handling approaches, data structure usage, and architectural patterns already in use. It must consider the existing code organization, module structure, and dependency management approaches. It must evaluate the current testing patterns, logging approaches, and configuration management styles. It should only update files when there is a clear necessity, not for cosmetic or preference-based changes. It should update the context of this file after each feature completion and update this replit.md file when new patterns or rules are discovered during development. It must follow DRY (Don't Repeat Yourself) principles – eliminating duplicate code, commits, and object instantiation. It must ensure database migrations match model declarations (column names, nullable fields, foreign keys) and proactively check and update related files when making changes – not waiting to be told. After every feature completion, it should analyze and remove unused imports and dead code. It should provide a concise summary after each feature: group methods/functions under each file created/modified, with a one-sentence purpose. It must update the Application Summary section at the end of this file when new features or major functionality are implemented. The agent's life depends on maintaining absolute consistency with the existing codebase patterns and never introducing foreign coding approaches 
+that conflict with the established development style.
 
-## Recent Feature/Refactor Summary
 
-### app/tasks/document_tasks.py
-- `generate_document_thumbnail`: Now uses Pillow, pdf2image, and docx2pdf to generate real thumbnails for DOCX, PDF, and image files. Removed all placeholder logic and comments.
-
-### app/tasks/payment_tasks.py
-- `send_payment_success_notification`, `send_payment_failure_notification`, `send_subscription_renewal_notification`: Now use the real EmailService to send notifications (SendGrid/SMTP), removed all print/log-only and placeholder logic.
-
-All placeholder, "for now", and TODO comments in these modules have been removed. All notification and thumbnail logic is now production-grade.
+## Rules for Implementation
+- NEVER create new files for features that can be enhanced in existing files
+- Always check existing codebase to edit before you just go adding new files or routes that was already existi 
 
 ## System Architecture
 
@@ -343,51 +198,3 @@ Moderator accounts are created by admins, who define roles and permissions (e.g.
 - **Swagger/OpenAPI**: Automatic API documentation
 - **Pytest**: Testing framework
 - **HTTPX**: Async HTTP client for testing
-
-## Code Cleanup & Organization Checklist
-
-### 1. Route Standardization
-- [ ] Standardize all routes to use consistent /api prefix
-- [ ] Remove version prefixes (v1, v2, etc.)
-- [ ] Clean up route naming (remove enhanced, advanced, etc.)
-- [ ] Organize route groups logically
-- [ ] Update OpenAPI documentation
-
-### 2. File Organization
-- [ ] Identify and remove duplicate files
-- [ ] Consolidate similar functionalities
-- [ ] Standardize file naming conventions
-- [ ] Create proper module hierarchy
-- [ ] Update import statements
-
-### 3. Code Cleanup
-- [ ] Remove unused imports
-- [ ] Clean up commented code
-- [ ] Fix inconsistent naming
-- [ ] Standardize error handling
-- [ ] Update type hints
-
-### 4. Service Layer
-- [ ] Consolidate duplicate services
-- [ ] Standardize service naming
-- [ ] Fix circular dependencies
-- [ ] Improve error handling
-- [ ] Add missing documentation
-
-### 5. Database & Models
-- [ ] Review and update migrations
-- [ ] Fix model relationships
-- [ ] Standardize model naming
-- [ ] Add missing indexes
-- [ ] Update field constraints
-
-### 6. Testing & Validation
-- [ ] Fix broken tests
-- [ ] Add missing tests
-- [ ] Update validation schemas
-- [ ] Test all routes
-- [ ] Verify dependencies
-
-## Agent progress
-
-- [x] Remove dev placeholders — MockRedis fallback made config-controlled and misleading startup prints reduced. See `main.py` and `config.py` for SKIP_DB_TABLE_CREATION and REDIS_ENABLED flags.
