@@ -77,4 +77,4 @@ externalPort = 4200
 
 [deployment]
 deploymentTarget = "vm"
-run = ["uv", "run", "gunicorn", "--config", "gunicorn.conf.py", "main:app"]
+run = ["uv", "run", "gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "main:app"]
