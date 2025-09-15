@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "MyTypist"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-this-for-production")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "3c8d10b78c430e7f7b3b3a39e9432d56a3e2a2c7a38d10c8c8b417f4b8f5a2b3")
 
     # PostgreSQL settings
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "mytypist")
