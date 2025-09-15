@@ -11,6 +11,7 @@ import platform
 
 def find_python():
     """Find available Python executable"""
+    import shutil
     python_commands = ['python', 'python3', 'py']
 
     if platform.system() == 'Windows':
@@ -18,13 +19,30 @@ def find_python():
 
     for cmd in python_commands:
         try:
-            result = subprocess.run([cmd, '--version'],
+            # Use shutil.which to get full path and validate it exists
+            python_path = shutil.which(cmd)
+            if not python_path:
+                continue
+            
+            # Basic path validation - ensure it's in expected system directories
+            if platform.system() == 'Windows':
+                safe_paths = ['python', 'anaconda', 'miniconda', 'program files']
+            else:
+                safe_paths = ['/usr/', '/opt/', '/home/', '/.pyenv/', '/Library/']
+            
+            # Allow if path contains expected directory patterns
+            path_lower = python_path.lower()
+            if not any(safe_path in path_lower for safe_path in safe_paths):
+                print(f"Skipping Python at suspicious path: {python_path}")
+                continue
+            
+            result = subprocess.run([python_path, '--version'],
                                   capture_output=True,
                                   text=True,
                                   timeout=5)
             if result.returncode == 0:
-                print(f"Found Python: {cmd} - {result.stdout.strip()}")
-                return cmd
+                print(f"Found Python: {python_path} - {result.stdout.strip()}")
+                return python_path
         except (subprocess.TimeoutExpired, FileNotFoundError):
             continue
 
