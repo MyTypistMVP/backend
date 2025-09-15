@@ -151,8 +151,16 @@ log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
 
 ### 3. Database Migration
 ```bash
-# Run migrations
-python -m alembic upgrade head
+# METHOD 1: Use Alembic migrations (Recommended)
+alembic upgrade head
+
+# METHOD 2: For fresh deployments or if migrations fail
+# All essential tables are created automatically on first run
+python main.py  # Tables auto-created on startup
+
+# Verify all tables exist
+psql $DATABASE_URL -c "\dt"
+# Should show: users, templates, documents, placeholders, signatures, payments, subscriptions, audit_logs, etc.
 
 # Create initial admin user (optional)
 python scripts/create_admin.py
@@ -610,11 +618,19 @@ ALLOWED_HOSTS='["mytypist.net", "api.mytypist.net"]'
 
 #### 2. **Database Migration**
 ```bash
-# Install dependencies
-pip install -r requirements.txt  or pyproject.toml
+# Install dependencies (use uv for faster installation)
+pip install uv
+uv sync
 
-# Run the application once to create tables
+# Run database migrations
+alembic upgrade head
+
+# Alternative: Start app to auto-create tables
 python main.py
+
+# Verify database setup
+curl http://localhost:5000/health
+# Should return: {"status": "healthy", "services": {"database": "healthy", "redis": "healthy"}}
 
 
 #### 3. **SSL/TLS Configuration** (CRITICAL)
