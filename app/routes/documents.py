@@ -466,15 +466,16 @@ async def generate_batch_documents(
     )
 
 
-@router.get("/{document_id}/download", response_class=FileResponse)
+@router.get("/{document_id}/download", response_class=FileResponse, operation_id="download_document")
 async def download_document(
     document_id: int,
     request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Download document file"""
+    """Download document file with guest restrictions"""
 
+    # Get the document with ownership check
     document = db.query(Document).filter(
         Document.id == document_id,
         Document.user_id == current_user.id
@@ -486,20 +487,31 @@ async def download_document(
             detail="Document not found"
         )
 
+    # Check for guest restrictions
+    if document.status == DocumentStatus.GUEST:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please register to download this document"
+        )
+
+    # Check if document is ready for download
     if not document.is_completed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Document is not ready for download"
         )
 
+    # Check if file exists
     if not document.file_path or not os.path.exists(document.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document file not found"
         )
 
-    # Update download count
+    # Update download stats
     document.download_count += 1
+    if not document.is_downloaded:
+        document.is_downloaded = True
     db.commit()
 
     # Log document download
@@ -509,7 +521,8 @@ async def download_document(
         request,
         {
             "document_id": document.id,
-            "title": document.title
+            "title": document.title,
+            "download_count": document.download_count
         }
     )
 
@@ -780,65 +793,6 @@ async def preview_document(
     return preview
 
 
-@router.get("/{document_id}/download")
-async def download_document(
-    document_id: int,
-    request: Request,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Download a document with guest restrictions"""
-    
-    # Get the document
-    document = db.query(Document).filter(
-        Document.id == document_id
-    ).first()
-    
-    if not document:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
-        )
-    
-    # Check access rights
-    if document.status == DocumentStatus.GUEST:
-        # Guest documents can only be downloaded by registering
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Please register to download this document"
-        )
-    
-    # For regular documents, check ownership
-    elif document.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
-        )
-    
-    # Update download stats
-    document.download_count += 1
-    if not document.is_downloaded:
-        document.is_downloaded = True
-    db.commit()
-    
-    # Log download event
-    AuditService.log_document_event(
-        "DOCUMENT_DOWNLOADED",
-        current_user.id,
-        request,
-        {
-            "document_id": document.id,
-            "title": document.title,
-            "download_count": document.download_count
-        }
-    )
-    
-    # Return file response
-    return FileResponse(
-        document.file_path,
-        filename=f"{document.title}.{document.file_format}",
-        media_type="application/octet-stream"
-    )
 
 
 @router.get("/shared/{share_token}")
