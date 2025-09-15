@@ -10,6 +10,12 @@ from alembic import op
 import json
 from datetime import datetime
 
+# revision identifiers, used by Alembic.
+revision = 'migrate_visit_data'
+down_revision = 'consolidate_visit_models'
+branch_labels = None
+depends_on = None
+
 
 def upgrade():
     # Get connection
