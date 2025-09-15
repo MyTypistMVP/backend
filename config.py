@@ -3,8 +3,10 @@ Configuration settings for MyTypist backend
 """
 
 import os
+import secrets
 from typing import List
 from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -35,8 +37,44 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", REDIS_URL)
     CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 
-    # JWT
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
+    # JWT - Secure configuration with validation
+    JWT_SECRET_KEY: str = Field(default_factory=lambda: os.getenv("JWT_SECRET_KEY", ""))
+    
+    @field_validator('JWT_SECRET_KEY')
+    @classmethod
+    def validate_jwt_secret_key(cls, value: str) -> str:
+        """Validate JWT secret key for security"""
+        # JWT_SECRET_KEY is mandatory for production security
+        if not value or value.strip() == "":
+            raise ValueError(
+                "JWT_SECRET_KEY environment variable is required for secure authentication. "
+                "Please set a cryptographically secure random key (32+ characters)."
+            )
+        
+        # Validate key strength
+        if len(value) < 32:
+            raise ValueError(
+                f"JWT_SECRET_KEY must be at least 32 characters long for security. "
+                f"Current length: {len(value)}"
+            )
+        
+        # Reject weak/default keys
+        weak_keys = [
+            "your-super-secret-key-change-this-for-production",
+            "secret",
+            "key", 
+            "password",
+            "jwt-secret",
+            "change-me"
+        ]
+        if value.lower() in [key.lower() for key in weak_keys]:
+            raise ValueError(
+                "JWT_SECRET_KEY cannot be a common/weak value. "
+                "Please use a cryptographically secure random key."
+            )
+        
+        return value
+    
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_HOURS: int = 24
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
