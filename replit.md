@@ -67,3 +67,189 @@ Moderator accounts are created by admins with tailored dashboards based on assig
 - **scrypt**
 - **pyotp**
 - **Sentry**
+
+
+
+## TODO
+
+
+The task.md is what we are dealing with
+# 🚨 PRODUCTION-LEVEL CODEBASE AUDIT & REFACTORING PROTOCOL
+
+## ⚠️ CRITICAL EXECUTION RULES - READ BEFORE STARTING
+
+### 🔒 MANDATORY WORKFLOW PROTOCOL
+**YOU MUST FOLLOW THIS EXACT SEQUENCE FOR EVERY SECTION:**
+
+1. **ANALYZE** → **FIX** → **VERIFY** → **TICK** → **MOVE TO NEXT**
+2. **NEVER** skip verification step
+3. **NEVER** work on multiple sections simultaneously
+4. **ALWAYS** mark completion with ✅ before proceeding
+5. **STOP AND RE-READ** this task.md if you feel rushed
+
+### 📋 AUDIT CHECKLIST - TICK (✅) AFTER COMPLETION
+
+#### 🏗️ ARCHITECTURE & STRUCTURE ANALYSIS
+- [ ] **File Organization Audit**
+  - Check for duplicate files/functionality
+  - Identify misplaced components
+  - Verify proper folder structure
+  - **ACTION REQUIRED:** List all structural improvements needed
+
+- [ ] **Dependency Mapping**
+  - Map all import/export relationships
+  - Identify circular dependencies
+  - Check for unused imports
+  - **ACTION REQUIRED:** Create dependency cleanup plan
+
+#### 🔧 CODE QUALITY DEEP SCAN
+
+- [ ] **Syntax & Logic Errors**
+  - **CRITICAL:** Fix ALL syntax errors
+  - Identify and resolve logic flaws
+  - Check for unreachable code
+  - **VERIFICATION:** Test each fix individually
+
+- [ ] **Naming Conventions Audit**
+  - Variables, functions, classes consistency
+  - File naming standards
+  - Database schema naming
+  - **ACTION REQUIRED:** Rename following industry standards
+
+- [ ] **Security Vulnerabilities**
+  - Input validation gaps
+  - Authentication/Authorization flaws
+  - Data exposure risks
+  - **CRITICAL:** Fix all security issues immediately
+
+#### 🛣️ ROUTES & ENDPOINTS AUDIT
+
+- [ ] **Route Structure Analysis**
+  - Check for duplicate routes
+  - Verify RESTful conventions
+  - Identify broken/unused routes
+  - **ACTION REQUIRED:** Consolidate and optimize routing
+
+- [ ] **API Endpoint Consistency**
+  - Request/Response format standardization
+  - Error handling uniformity
+  - Status code accuracy
+  - **VERIFICATION:** Test all endpoints after fixes
+
+#### 🗄️ DATABASE & DATA LAYER
+
+- [ ] **Schema Integrity Check**
+  - Foreign key relationships
+  - Index optimization
+  - Data type consistency
+  - **ACTION REQUIRED:** Fix all relationship issues
+
+- [ ] **Query Optimization**
+  - Identify N+1 queries
+  - Check for missing indexes
+  - Optimize slow queries
+  - **VERIFICATION:** Performance test all optimizations
+
+#### 🎨 FRONTEND CONSISTENCY
+
+- [ ] **Component Architecture**
+  - Identify duplicate components
+  - Check for unused components
+  - Verify prop types/interfaces
+  - **ACTION REQUIRED:** Consolidate similar components
+
+- [ ] **State Management**
+  - Check for state management inconsistencies
+  - Identify prop drilling issues
+  - Verify global state usage
+  - **VERIFICATION:** Test state updates thoroughly
+
+#### 🧪 TESTING & DOCUMENTATION
+
+- [ ] **Test Coverage Analysis**
+  - Identify untested code paths
+  - Check for broken tests
+  - Verify test data validity
+  - **ACTION REQUIRED:** Achieve minimum 80% coverage
+
+- [ ] **Documentation Completeness**
+  - API documentation accuracy
+  - Code comments clarity
+  - README.md completeness
+  - **VERIFICATION:** Ensure documentation matches code
+
+## 🚦 EXECUTION PROTOCOL
+
+### ⏰ TIME ALLOCATION PER SECTION
+- **Analysis Phase:** 25% of time
+- **Fix Implementation:** 50% of time
+- **Verification Phase:** 25% of time
+
+### 🔍 VERIFICATION REQUIREMENTS
+After fixing each section, you MUST:
+
+1. **✅ FUNCTIONALITY TEST** - Verify feature works as expected
+2. **✅ INTEGRATION TEST** - Check related components still function
+3. **✅ PERFORMANCE TEST** - Ensure no performance degradation
+4. **✅ SECURITY TEST** - Verify no new vulnerabilities introduced
+
+### 📝 PROGRESS TRACKING
+**AFTER COMPLETING EACH SECTION:**
+```
+✅ [SECTION NAME] - Fixed: [BRIEF DESCRIPTION]
+   - Files Modified: [LIST]
+   - Impact Radius: [AFFECTED COMPONENTS]
+   - Verification Status: PASSED ✅
+   - Next Section: [NAME]
+```
+
+## 🚨 CRITICAL RULES - NEVER VIOLATE
+
+### 🚫 FORBIDDEN ACTIONS
+- **NEVER** delete files without verifying feature migration
+- **NEVER** create duplicate functionality
+- **NEVER** skip the verification phase
+- **NEVER** make changes affecting multiple sections simultaneously
+- **NEVER** apply patches - only production-grade solutions
+
+### ✅ MANDATORY ACTIONS
+- **ALWAYS** check if features can be merged before creating new files
+- **ALWAYS** rename files following proper conventions
+- **ALWAYS** test related components after each fix
+- **ALWAYS** document breaking changes
+- **ALWAYS** preserve existing functionality during refactoring
+
+### 🎯 SUCCESS CRITERIA
+A section is only complete when:
+- ✅ All identified issues are fixed
+- ✅ All tests pass
+- ✅ No regression in related components
+- ✅ Performance maintained or improved
+- ✅ Security maintained or enhanced
+- ✅ Documentation updated
+- ✅ Verification checklist completed
+- ✅ Progress tracking updated
+
+## 📊 FINAL CLEANUP PHASE
+**ONLY AFTER ALL SECTIONS COMPLETED:**
+
+- [ ] **Dead Code Elimination**
+  - Remove unused functions/variables
+  - Delete orphaned files
+  - Clean up commented code
+
+- [ ] **Final Integration Test**
+  - Full application smoke test
+  - Performance benchmark
+  - Security audit
+
+- [ ] **Production Readiness Check**
+  - Environment configuration
+  - Deployment validation
+  - Monitoring setup
+
+---
+
+## ⚡ REMEMBER: PRODUCTION-LEVEL MEANS ZERO COMPROMISES
+
+**If you're ever unsure, STOP and re-read this protocol. Quality over speed. Precision over patches. Excellence is the only acceptable standard.**
