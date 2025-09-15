@@ -331,7 +331,7 @@ class DatabaseOptimizationManager:
                     if not result:
                         # Create index
                         columns_str = ", ".join(columns)
-                        create_query = f"CREATE INDEX CONCURRENTLY IF NOT EXISTS {index_name} ON {table_name} ({columns_str})"
+                        create_query = "CREATE INDEX CONCURRENTLY IF NOT EXISTS {} ON {} ({})".format(index_name, table_name, columns_str)
                         
                         db.execute(text(create_query))
                         db.commit()
@@ -369,7 +369,7 @@ class DatabaseOptimizationManager:
                 try:
                     # Don't remove recently created indexes
                     if not any(created in index_name for created in ['_created_at', '_id']):
-                        drop_query = f"DROP INDEX CONCURRENTLY IF EXISTS {index_name}"
+                        drop_query = "DROP INDEX CONCURRENTLY IF EXISTS {}".format(index_name)
                         db.execute(text(drop_query))
                         db.commit()
                         
@@ -402,7 +402,7 @@ class DatabaseOptimizationManager:
                 table_name = row[0]
                 try:
                     # Analyze table
-                    analyze_query = f"ANALYZE {table_name}"
+                    analyze_query = "ANALYZE {}".format(table_name)
                     db.execute(text(analyze_query))
                     analyzed_tables.append(table_name)
                     
