@@ -205,64 +205,118 @@ class PaymentService:
     
     @staticmethod
     def _handle_charge_completed(data: Dict[str, Any]) -> bool:
-        """Handle successful charge webhook"""
+        """Handle successful charge webhook with atomic transaction protection"""
         
         db = next(get_db())
         
         try:
             tx_ref = data.get("tx_ref")
+            
+            # Use SELECT FOR UPDATE to prevent race conditions
             payment = db.query(Payment).filter(
                 Payment.flutterwave_tx_ref == tx_ref
-            ).first()
+            ).with_for_update().first()
             
-            if payment:
+            if not payment:
+                return False
+                
+            # Prevent duplicate processing - check if already completed
+            if payment.status == PaymentStatus.COMPLETED:
+                return True  # Already processed, avoid duplicate
+            
+            # Begin atomic transaction for all payment updates
+            try:
+                # Update all payment fields atomically
                 payment.status = PaymentStatus.COMPLETED
                 payment.completed_at = datetime.utcnow()
                 payment.processor_response = data
                 payment.flutterwave_id = data.get("id")
                 
-                # Update fees and amounts
+                # Update fees and amounts atomically
                 payment.app_fee = float(data.get("app_fee", 0))
                 payment.merchant_fee = float(data.get("merchant_fee", 0))
                 payment.processor_fee = float(data.get("processor_fee", 0))
                 payment.net_amount = float(data.get("amount_settled", payment.amount))
                 
+                # Process subscription atomically in same transaction
+                subscription = db.query(Subscription).filter(
+                    Subscription.payment_id == payment.id
+                ).first()
+                
+                if subscription and subscription.status != SubscriptionStatus.ACTIVE:
+                    subscription.status = SubscriptionStatus.ACTIVE
+                    subscription.activated_at = datetime.utcnow()
+                    
+                    # Generate invoice in same transaction
+                    invoice = PaymentService._generate_invoice_atomic(db, subscription, payment)
+                
+                # Commit all changes atomically
                 db.commit()
                 
-                # Process subscription if this is a subscription payment
-                PaymentService._process_subscription_payment(db, payment)
+                return True
+                
+            except Exception as e:
+                # Rollback on any error to maintain consistency
+                db.rollback()
+                raise e
             
-            return True
-        
         except Exception as e:
             print(f"Error handling charge completed: {e}")
+            db.rollback()
             return False
         finally:
             db.close()
     
     @staticmethod
     def _handle_charge_failed(data: Dict[str, Any]) -> bool:
-        """Handle failed charge webhook"""
+        """Handle failed charge webhook with atomic transaction protection"""
         
         db = next(get_db())
         
         try:
             tx_ref = data.get("tx_ref")
+            
+            # Use SELECT FOR UPDATE to prevent race conditions  
             payment = db.query(Payment).filter(
                 Payment.flutterwave_tx_ref == tx_ref
-            ).first()
+            ).with_for_update().first()
             
-            if payment:
+            if not payment:
+                return False
+                
+            # Prevent duplicate processing - check if already failed
+            if payment.status == PaymentStatus.FAILED:
+                return True  # Already processed, avoid duplicate
+            
+            try:
+                # Update payment atomically
                 payment.status = PaymentStatus.FAILED
                 payment.processor_response = data
                 payment.error_message = data.get("narration", "Payment failed")
+                payment.failed_at = datetime.utcnow()
                 
+                # If this was a subscription payment, handle subscription failure
+                subscription = db.query(Subscription).filter(
+                    Subscription.payment_id == payment.id
+                ).first()
+                
+                if subscription and subscription.status == SubscriptionStatus.PENDING:
+                    subscription.status = SubscriptionStatus.FAILED
+                    subscription.failure_reason = payment.error_message
+                
+                # Commit all changes atomically
                 db.commit()
+                
+                return True
+                
+            except Exception as e:
+                # Rollback on any error to maintain consistency  
+                db.rollback()
+                raise e
             
-            return True
-        
         except Exception as e:
             print(f"Error handling charge failed: {e}")
+            db.rollback()
             return False
         finally:
             db.close()
@@ -546,24 +600,42 @@ class PaymentService:
         db.commit()
     
     @staticmethod
-    def _process_subscription_payment(db: Session, payment: Payment) -> None:
-        """Process completed subscription payment"""
+    def _generate_invoice_atomic(db: Session, subscription: Subscription, payment: Payment) -> Invoice:
+        """Generate invoice for subscription payment atomically within transaction"""
         
-        if payment.status != PaymentStatus.COMPLETED:
-            return
+        invoice_number = f"INV-{datetime.utcnow().strftime('%Y%m%d')}-{subscription.id:06d}"
         
-        # Find associated subscription
-        subscription = db.query(Subscription).filter(
-            Subscription.payment_id == payment.id
-        ).first()
+        line_items = [
+            {
+                "description": f"{subscription.plan.value.title()} Plan - {subscription.billing_cycle.title()}",
+                "quantity": 1,
+                "unit_price": subscription.amount,
+                "total": subscription.amount
+            }
+        ]
         
-        if subscription:
-            # Activate subscription
-            subscription.status = SubscriptionStatus.ACTIVE
-            db.commit()
-            
-            # Generate invoice
-            PaymentService._generate_invoice(db, subscription, payment)
+        invoice = Invoice(
+            user_id=subscription.user_id,
+            subscription_id=subscription.id,
+            payment_id=payment.id,
+            invoice_number=invoice_number,
+            amount=subscription.amount,
+            currency=payment.currency,
+            total_amount=subscription.amount,
+            billing_period_start=subscription.starts_at,
+            billing_period_end=subscription.ends_at,
+            due_date=subscription.starts_at + timedelta(days=30),
+            status="paid",
+            paid_at=payment.completed_at,
+            customer_name=payment.customer_name,
+            customer_email=payment.customer_email,
+            line_items=line_items
+        )
+        
+        db.add(invoice)
+        # Note: Not calling commit() here - will be committed by caller atomically
+        
+        return invoice
     
     @staticmethod
     def _generate_invoice(db: Session, subscription: Subscription, payment: Payment) -> Invoice:
