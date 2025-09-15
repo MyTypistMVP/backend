@@ -6,6 +6,7 @@ High-performance document automation platform with Flutterwave integration
 import os
 import time
 from contextlib import asynccontextmanager
+from typing import Union
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -35,7 +36,18 @@ if settings.SKIP_DB_TABLE_CREATION:
     # Skip database table creation when explicitly requested; migrations should be used in normal workflows
     print("⚠️ SKIP_DB_TABLE_CREATION enabled — automatic table creation is disabled. Use Alembic migrations to manage schema changes.")
 
+# MockRedis class for development
+class MockRedis:
+    def ping(self): return True
+    def get(self, key): return None
+    def set(self, key, value, ex=None): return True
+    def setex(self, key, time, value): return True
+    def delete(self, key): return True
+    def incr(self, key): return 1
+    def expire(self, key, time): return True
+
 # Initialize Redis (optional)
+redis_client: Union[redis.Redis, MockRedis]
 if settings.REDIS_ENABLED:
     try:
         redis_client = redis.Redis(
@@ -50,27 +62,9 @@ if settings.REDIS_ENABLED:
     except Exception as e:
         print(f"⚠️ Redis connection failed: {e}")
         # Fall back to a mock for local development when explicitly enabled but failing
-        class MockRedis:
-            def ping(self): return True
-            def get(self, key): return None
-            def set(self, key, value, ex=None): return True
-            def setex(self, key, time, value): return True
-            def delete(self, key): return True
-            def incr(self, key): return 1
-            def expire(self, key, time): return True
-
         redis_client = MockRedis()
 else:
     # Use a mock Redis client for development when Redis is disabled
-    class MockRedis:
-        def ping(self): return True
-        def get(self, key): return None
-        def set(self, key, value, ex=None): return True
-        def setex(self, key, time, value): return True
-        def delete(self, key): return True
-        def incr(self, key): return 1
-        def expire(self, key, time): return True
-
     redis_client = MockRedis()
 
 # Initialize Celery
@@ -160,7 +154,7 @@ app.add_middleware(SecurityMiddleware)
 app.add_middleware(RequestValidationMiddleware)
 app.add_middleware(CSRFProtectionMiddleware)
 app.add_middleware(AuditMiddleware)
-app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
+app.add_middleware(RateLimitMiddleware, redis_client=redis_client)  # type: ignore
 
 # CORS middleware
 app.add_middleware(
@@ -303,13 +297,6 @@ app.include_router(anonymous.router, prefix="/api/anonymous", tags=["Anonymous"]
 from app.routes import admin_rewards
 app.include_router(admin_rewards.router)
 
-# Include push notifications
-try:
-    from app.routes.push_notifications import router as push_router
-    app.include_router(push_router, prefix="/api/push", tags=["Push Notifications"])
-    print("✅ Push notification system with FCM and APNS loaded")
-except ImportError as e:
-    print(f"⚠️  Push notification system not available: {e}")
 
 # Core authentication and document processing features loaded (routers registered)
 print("ℹ️ Routers registered for authentication and document processing. Verify feature readiness with tests and documentation.")
