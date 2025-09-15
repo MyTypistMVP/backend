@@ -5,7 +5,7 @@ integrations = ["python_sendgrid:1.0.0", "python_database:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "file", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libGL", "libGLU", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libmaxminddb", "libtiff", "libuv", "libwebp", "libxcrypt", "mupdf", "openjpeg", "openssl", "pango", "pkg-config", "poppler_utils", "redis", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xsimd", "zlib"]
+packages = ["cargo", "file", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libGL", "libGLU", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libmaxminddb", "libtiff", "libuv", "libwebp", "libxcrypt", "mupdf", "openjpeg", "openssl", "pango", "pkg-config", "poppler_utils", "redis", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xsimd", "zlib", "poppler"]
 
 [workflows]
 runButton = "Project"
@@ -22,6 +22,10 @@ args = "MyTypist Backend"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Redis Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Celery Worker"
 
 [[workflows.workflow]]
 name = "MyTypist Backend"
@@ -46,6 +50,17 @@ outputType = "console"
 task = "shell.exec"
 args = "redis-server --port 6000 --save \"\" --appendonly no --bind 0.0.0.0"
 waitForPort = 6000
+
+[[workflows.workflow]]
+name = "Celery Worker"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "uv run celery -A main.celery_app worker --loglevel=info"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000
