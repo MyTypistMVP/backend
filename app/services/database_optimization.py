@@ -329,9 +329,9 @@ class DatabaseOptimizationManager:
                     result = db.execute(text(check_query), {"index_name": index_name, "table_name": table_name}).fetchone()
                     
                     if not result:
-                        # Create index
-                        columns_str = ", ".join(columns)
-                        create_query = "CREATE INDEX CONCURRENTLY IF NOT EXISTS {} ON {} ({})".format(index_name, table_name, columns_str)
+                        # Create index with proper identifier quoting
+                        columns_str = ", ".join(f'"{col}"' for col in columns)
+                        create_query = f'CREATE INDEX CONCURRENTLY IF NOT EXISTS "{index_name}" ON "{table_name}" ({columns_str})'
                         
                         db.execute(text(create_query))
                         db.commit()
@@ -369,12 +369,14 @@ class DatabaseOptimizationManager:
                 try:
                     # Don't remove recently created indexes
                     if not any(created in index_name for created in ['_created_at', '_id']):
-                        drop_query = "DROP INDEX CONCURRENTLY IF EXISTS {}".format(index_name)
-                        db.execute(text(drop_query))
-                        db.commit()
-                        
-                        removed_indexes.append(index_name)
-                        db_logger.info(f"Removed unused index: {index_name}")
+                        # Validate identifier and add proper quoting
+                        if index_name.replace('_', '').replace('-', '').isalnum():
+                            drop_query = f'DROP INDEX CONCURRENTLY IF EXISTS "{index_name}"'
+                            db.execute(text(drop_query))
+                            db.commit()
+                            
+                            removed_indexes.append(index_name)
+                            db_logger.info(f"Removed unused index: {index_name}")
                         
                 except Exception as e:
                     db_logger.error(f"Failed to remove index {index_name}: {e}")
@@ -401,10 +403,11 @@ class DatabaseOptimizationManager:
             for row in result:
                 table_name = row[0]
                 try:
-                    # Analyze table
-                    analyze_query = "ANALYZE {}".format(table_name)
-                    db.execute(text(analyze_query))
-                    analyzed_tables.append(table_name)
+                    # Validate identifier and analyze table with proper quoting
+                    if table_name.replace('_', '').isalnum():
+                        analyze_query = f'ANALYZE "{table_name}"'
+                        db.execute(text(analyze_query))
+                        analyzed_tables.append(table_name)
                     
                 except Exception as e:
                     db_logger.error(f"Failed to analyze table {table_name}: {e}")
