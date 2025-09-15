@@ -73,4 +73,4 @@ externalPort = 3000
 
 [deployment]
 deploymentTarget = "vm"
-run = ["gunicorn", "--conf", "gunicorn.conf.py", "--bind=0.0.0.0:5000", "--reuse-port", "main:app"]
+run = ["uv", "run", "gunicorn", "--config", "gunicorn.conf.py", "main:app"]
