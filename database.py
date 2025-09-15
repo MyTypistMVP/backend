@@ -143,8 +143,7 @@ class DatabaseManager:
                     "pool_size": engine.pool.size(),
                     "checked_out": engine.pool.checkedout(),
                     "overflow": engine.pool.overflow(),
-                    "checked_in": engine.pool.checkedin(),
-                    "invalidated": engine.pool.invalidated()
+                    "checked_in": engine.pool.checkedin()
                 }
 
                 # Database performance stats
