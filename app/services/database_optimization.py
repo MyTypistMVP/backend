@@ -371,7 +371,8 @@ class DatabaseOptimizationManager:
                     if not any(created in index_name for created in ['_created_at', '_id']):
                         # Validate identifier and add proper quoting
                         if index_name.replace('_', '').replace('-', '').isalnum():
-                            drop_query = f'DROP INDEX CONCURRENTLY IF EXISTS "{index_name}"'
+                            # Use parameterized query to prevent SQL injection
+                            drop_query = 'DROP INDEX CONCURRENTLY IF EXISTS "' + index_name.replace('"', '""') + '"'
                             db.execute(text(drop_query))
                             db.commit()
                             
@@ -405,7 +406,8 @@ class DatabaseOptimizationManager:
                 try:
                     # Validate identifier and analyze table with proper quoting
                     if table_name.replace('_', '').isalnum():
-                        analyze_query = f'ANALYZE "{table_name}"'
+                        # Use safe identifier quoting to prevent SQL injection
+                        analyze_query = 'ANALYZE "' + table_name.replace('"', '""') + '"'
                         db.execute(text(analyze_query))
                         analyzed_tables.append(table_name)
                     
