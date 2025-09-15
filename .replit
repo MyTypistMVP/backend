@@ -71,10 +71,6 @@ externalPort = 3003
 localPort = 39813
 externalPort = 3000
 
-[[ports]]
-localPort = 41295
-externalPort = 4200
-
 [deployment]
 deploymentTarget = "vm"
 run = ["gunicorn", "--conf", "gunicorn.conf.py", "--bind=0.0.0.0:5000", "--reuse-port", "main:app"]
