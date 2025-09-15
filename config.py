@@ -26,10 +26,10 @@ class Settings(BaseSettings):
 
     # Redis (optional for caching and rate limiting)
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6000"))
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
     REDIS_URL: str = os.getenv("REDIS_URL", f"redis://{REDIS_HOST}:{REDIS_PORT}")
-    REDIS_ENABLED: bool = os.getenv("REDIS_ENABLED", "false").lower() == "true"  # Disabled by default in Replit
+    REDIS_ENABLED: bool = os.getenv("REDIS_ENABLED", "true").lower() == "true"  # Enabled for production use
 
     # Celery
     CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", REDIS_URL)

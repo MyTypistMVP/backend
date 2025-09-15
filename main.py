@@ -6,7 +6,6 @@ High-performance document automation platform with Flutterwave integration
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Union
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -36,36 +35,25 @@ if settings.SKIP_DB_TABLE_CREATION:
     # Skip database table creation when explicitly requested; migrations should be used in normal workflows
     print("⚠️ SKIP_DB_TABLE_CREATION enabled — automatic table creation is disabled. Use Alembic migrations to manage schema changes.")
 
-# MockRedis class for development
-class MockRedis:
-    def ping(self): return True
-    def get(self, key): return None
-    def set(self, key, value, ex=None): return True
-    def setex(self, key, time, value): return True
-    def delete(self, key): return True
-    def incr(self, key): return 1
-    def expire(self, key, time): return True
+# Initialize Redis - Real Redis only, no mocks for production applications
+redis_client = redis.Redis(
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    password=settings.REDIS_PASSWORD,
+    decode_responses=True,
+    socket_connect_timeout=5,
+    socket_timeout=5,
+    retry_on_timeout=True
+)
 
-# Initialize Redis (optional)
-redis_client: Union[redis.Redis, MockRedis]
-if settings.REDIS_ENABLED:
-    try:
-        redis_client = redis.Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            password=settings.REDIS_PASSWORD,
-            decode_responses=True,
-            socket_connect_timeout=5
-        )
-        # Test connection
-        redis_client.ping()
-    except Exception as e:
-        print(f"⚠️ Redis connection failed: {e}")
-        # Fall back to a mock for local development when explicitly enabled but failing
-        redis_client = MockRedis()
-else:
-    # Use a mock Redis client for development when Redis is disabled
-    redis_client = MockRedis()
+# Test Redis connection on startup - fail fast if Redis is not available
+try:
+    redis_client.ping()
+    print("✅ Redis connection established")
+except Exception as e:
+    print(f"❌ Redis connection failed: {e}")
+    print("💡 Redis is required for caching, sessions, and background tasks")
+    raise RuntimeError(f"Redis connection failed: {e}") from e
 
 # Initialize Celery
 celery_app = Celery(

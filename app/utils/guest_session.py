@@ -74,7 +74,7 @@ async def get_or_create_guest_session(request: Request) -> str:
     # Store in Redis with 24h expiry
     redis_client.setex(
         f"guest_session:{session_id}",
-        timedelta(hours=24).seconds,
+        int(timedelta(hours=24).total_seconds()),
         json.dumps(session_data)
     )
     
