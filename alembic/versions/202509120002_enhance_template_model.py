@@ -16,22 +16,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add new columns to templates table
-    op.add_column('templates', sa.Column('preview_file_path', sa.String(500), nullable=True))
-    op.add_column('templates', sa.Column('token_cost', sa.Integer(), nullable=False, server_default='1'))
-    op.add_column('templates', sa.Column('preview_count', sa.Integer(), nullable=False, server_default='0'))
-    op.add_column('templates', sa.Column('preview_to_download_rate', sa.Float(), nullable=False, server_default='0.0'))
-    op.add_column('templates', sa.Column('average_generation_time', sa.Float(), nullable=True))
-    op.add_column('templates', sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')))
-    op.add_column('templates', sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')))
+    # Add new metric columns to templates table (using IF NOT EXISTS to avoid conflicts)
+    # Note: preview_file_path, token_cost, created_at, updated_at already exist in base migration
+    op.execute('ALTER TABLE templates ADD COLUMN IF NOT EXISTS preview_count INTEGER NOT NULL DEFAULT 0')
+    op.execute('ALTER TABLE templates ADD COLUMN IF NOT EXISTS preview_to_download_rate FLOAT NOT NULL DEFAULT 0.0')  
+    op.execute('ALTER TABLE templates ADD COLUMN IF NOT EXISTS average_generation_time FLOAT')
 
 
 def downgrade() -> None:
-    # Remove new columns from templates table
-    op.drop_column('templates', 'preview_file_path')
-    op.drop_column('templates', 'token_cost')
+    # Remove only the metric columns added in this migration
+    # Note: preview_file_path, token_cost, created_at, updated_at belong to base migration
     op.drop_column('templates', 'preview_count')
     op.drop_column('templates', 'preview_to_download_rate')
     op.drop_column('templates', 'average_generation_time')
-    op.drop_column('templates', 'created_at')
-    op.drop_column('templates', 'updated_at')
