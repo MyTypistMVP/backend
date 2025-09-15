@@ -322,11 +322,11 @@ class DatabaseOptimizationManager:
             for index_name, table_name, columns in index_definitions:
                 try:
                     # Check if index exists
-                    check_query = f"""
+                    check_query = """
                     SELECT 1 FROM pg_indexes 
-                    WHERE indexname = '{index_name}' AND tablename = '{table_name}'
+                    WHERE indexname = :index_name AND tablename = :table_name
                     """
-                    result = db.execute(text(check_query)).fetchone()
+                    result = db.execute(text(check_query), {"index_name": index_name, "table_name": table_name}).fetchone()
                     
                     if not result:
                         # Create index
