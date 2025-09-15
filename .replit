@@ -1,4 +1,4 @@
-modules = ["python-3.11", "postgresql-16"]
+modules = ["python-3.11"]
 [agent]
 expertMode = true
 integrations = ["python_sendgrid:1.0.0", "python_database:1.0.0"]
@@ -71,6 +71,10 @@ externalPort = 3003
 localPort = 39813
 externalPort = 3000
 
+[[ports]]
+localPort = 41295
+externalPort = 4200
+
 [deployment]
 deploymentTarget = "vm"
-run = ["uv", "run", "python", "main.py"]
+run = ["gunicorn", "--conf", "gunicorn.conf.py", "--bind=0.0.0.0:5000", "--reuse-port", "main:app"]
