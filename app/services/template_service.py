@@ -10,19 +10,55 @@ def process_preview_file(file, *args, **kwargs):
 Template management and processing service
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime
+import os
+import time
+import uuid
+import hashlib
+import json
+import re
 import logging
-from sqlalchemy.orm import Session
+import asyncio
+from datetime import datetime
+from typing import Dict, List, Optional, Any, Tuple
+from pathlib import Path
 
-from app.models.template import Template
+from sqlalchemy.orm import Session
+from sqlalchemy import desc, and_, or_, func
+from fastapi import UploadFile, HTTPException, status
+from docx import Document as DocxDocument
+import redis
+
+from config import settings
+from app.models.template import Template, Placeholder
+from app.models.template_management import TemplateCategory, TemplateReview
+from app.models.template_purchase import TemplatePurchase
+from app.models.template_favorite import TemplateFavorite
+from app.models.user import User
 from app.services.batch_process_service import BatchProcessService
 from app.services.cache_service import CacheService
+from app.services.admin_service import AdminService
+from app.services.audit_service import AuditService
+from app.services.wallet_service import WalletService
+from app.services.token_management_service import TokenManagementService
+from app.schemas.template import (
+    TemplateCreate,
+    TemplateUpdate,
+    TemplateSearch,
+    TemplatePreview,
+    TemplateUpload,
+    TemplateRating,
+    TemplateStats,
+    PlaceholderCreate
+)
+from app.utils.storage import StorageService
+from app.utils.security import validate_file_security
+from app.utils.validation import validate_template_metadata
 from app.utils.monitoring import (
     ACTIVE_TEMPLATE_OPERATIONS,
     TEMPLATE_LOAD_TIME,
     TEMPLATE_ERRORS
 )
+from database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -132,88 +168,7 @@ class TemplateLoader:
             logger.error(f"Template preload error: {e}")
             return False
 
-class TemplateSimilarityService:mport os
-import uuid
-import hashlib
-import json
-import re
-import logging
-from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
-from pathlib import Path
 
-from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_, or_, func
-from fastapi import UploadFile, HTTPException, status
-from docx import Document as DocxDocument
-import redis
-
-from config import settings
-from app.models.template import Template, Placeholder
-from app.models.template_management import TemplateCategory, TemplateReview
-from app.models.template_purchase import TemplatePurchase
-from app.models.template_favorite import TemplateFavorite
-from app.models.user import User
-import time
-import asyncio
-from prometheus_client import Counter, Histogram, Gauge
-from app.services.admin_service import AdminService
-from app.schemas.template import (
-    TemplateCreate,
-    TemplateUpdate,
-    TemplateSearch,
-    TemplatePreview,
-    TemplateUpload,
-    TemplateRating,
-    TemplateStats,
-    PlaceholderCreate
-)
-from app.utils.storage import StorageService
-from app.utils.security import validate_file_security
-from app.utils.validation import validate_template_metadata
-from app.services.audit_service import AuditService
-from database import get_db
-from app.services.wallet_service import WalletService
-from app.services.token_management_service import TokenManagementService
-
-# Redis client for caching
-redis_client = redis.Redis(
-    host=settings.REDIS_HOST,
-    port=settings.REDIS_PORT,
-    decode_responses=True
-)
-
-# Performance metrics
-TEMPLATE_LOAD_TIME = Histogram(
-    'template_load_seconds',
-    'Time spent loading templates',
-    ['method', 'cache_status']
-)
-
-TEMPLATE_CACHE_HITS = Counter(
-    'template_cache_hits_total',
-    'Number of template cache hits'
-)
-
-TEMPLATE_CACHE_MISSES = Counter(
-    'template_cache_misses_total',
-    'Number of template cache misses'
-)
-
-TEMPLATE_ERRORS = Counter(
-    'template_errors_total',
-    'Number of template operation errors',
-    ['operation']
-)
-
-ACTIVE_TEMPLATE_OPERATIONS = Gauge(
-    'template_operations_active',
-    'Number of active template operations'
-)
-
-from app.services.cache_service import CacheService
-
-from app.services.batch_process_service import BatchProcessService
 
 class TemplateSimilarityService:
     """Service for template similarity and recommendations"""

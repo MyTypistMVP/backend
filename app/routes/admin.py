@@ -713,13 +713,6 @@ async def track_page_visit(
             session_id=session_id,
             request=request,
             request_data=request_data
-            page_path=page_path,
-            user_id=user_id,
-            session_id=session_id,
-            ip_address=client_ip,
-            user_agent=user_agent,
-            referrer=referrer,
-            device_info=device_info
         )
 
         return result

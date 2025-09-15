@@ -67,7 +67,7 @@ class BaseVisit(Base):
     last_interaction_at = Column(DateTime, nullable=True)
 
     # Additional data
-    metadata = Column(JSON, nullable=True)  # For extensible properties
+    visit_metadata = Column(JSON, nullable=True)  # For extensible properties
 
 
 class DocumentVisit(BaseVisit):

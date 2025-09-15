@@ -8,8 +8,10 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from fastapi import Request
 
 from app.models.analytics.visit import BaseVisit, DocumentVisit, LandingVisit, PageVisit
+from app.services.cache_service import CacheService
 
 logger = logging.getLogger(__name__)
 

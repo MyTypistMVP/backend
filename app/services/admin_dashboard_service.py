@@ -966,11 +966,6 @@ class AdminDashboardService:
                 'average_minutes_saved': round(time_savings.avg_saved or 0, 2)
             }
         }
-            ).filter(
-                Document.status == 'completed',
-                Document.created_at.between(start_time, end_time)
-            ).scalar()
-        }
 
     @staticmethod
     async def _calculate_customer_value_metrics(db: Session, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
@@ -1455,25 +1450,7 @@ class AdminDashboardService:
             raise
 
 
-class PageVisit(Base):
-    """Track page visits for analytics"""
-    __tablename__ = "page_visits"
-
-    id = Column(Integer, primary_key=True, index=True)
-    page_path = Column(String(500), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
-    session_id = Column(String(100), nullable=True, index=True)
-    ip_address = Column(String(45), nullable=True)
-    user_agent = Column(Text, nullable=True)
-    referrer = Column(String(500), nullable=True)
-    visit_duration = Column(Integer, default=0)  # seconds
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-
-    # Analytics data
-    device_type = Column(String(50), nullable=True)  # mobile, desktop, tablet
-    browser = Column(String(100), nullable=True)
-    country = Column(String(100), nullable=True)
-    city = Column(String(100), nullable=True)
+# PageVisit model is imported from app.models.analytics.visit
 
 
 class AnalyticsSummary(Base):
