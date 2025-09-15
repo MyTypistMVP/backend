@@ -59,19 +59,12 @@ class Document(Base):
     seo_description = Column(Text, nullable=True)  # SEO meta description
     view_count = Column(Integer, nullable=False, default=0)  # Number of views
     
-    # Relationships
-    visits = relationship("Visit", back_populates="document")
-    is_downloaded = Column(Boolean, nullable=False, default=False)  # Track if document was downloaded
-    download_count = Column(Integer, nullable=False, default=0)  # Number of downloads
-    last_downloaded_at = Column(DateTime, nullable=True)  # Last download timestamp
-    
-    # SEO and sharing
-    is_public = Column(Boolean, nullable=False, default=False)  # Whether document is publicly accessible
-    seo_title = Column(String(255), nullable=True)  # SEO optimized title
-    seo_description = Column(Text, nullable=True)  # SEO meta description
-    view_count = Column(Integer, nullable=False, default=0)  # Number of views
+    # Document access and sharing
     access_level = Column(Enum(DocumentAccess), nullable=False, default=DocumentAccess.PRIVATE)
     version = Column(String(20), nullable=False, default="1.0")
+    
+    # Relationships
+    visits = relationship("DocumentVisit", back_populates="document", cascade="all, delete-orphan")
     
     # Processing information
     generation_time = Column(Float, nullable=True)  # seconds
@@ -81,8 +74,6 @@ class Document(Base):
     # Sharing and collaboration
     share_token = Column(String(64), nullable=True, unique=True)
     share_expires_at = Column(DateTime, nullable=True)
-    download_count = Column(Integer, nullable=False, default=0)
-    view_count = Column(Integer, nullable=False, default=0)
     
     # Compliance and security
     is_encrypted = Column(Boolean, nullable=False, default=False)
@@ -103,7 +94,6 @@ class Document(Base):
     user = relationship("User", back_populates="documents")
     template = relationship("Template", back_populates="documents")
     signatures = relationship("Signature", back_populates="document", cascade="all, delete-orphan")
-    visits = relationship("Visit", back_populates="document", cascade="all, delete-orphan")
     
     # Timestamps
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
@@ -125,9 +115,7 @@ class Document(Base):
         from datetime import datetime
         return (
             getattr(self, 'status', None) == DocumentStatus.COMPLETED and
-            getattr(self, 'deleted_at', None) is None and
-            (getattr(self, 'retention_expires_at', None) is None or 
-             getattr(self, 'retention_expires_at', None) > datetime.now())
+            getattr(self, 'deleted_at', None) is None
         )
     
     @property

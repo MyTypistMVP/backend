@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "MyTypist"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-this")
+    DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-this-for-production")
 
     # PostgreSQL settings
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "mytypist")
@@ -41,9 +41,9 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_HOURS: int = 24
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    # Security
-    ALLOWED_HOSTS: List[str] = ["*"]  # Allow all hosts for Replit proxy
-    ALLOWED_ORIGINS: List[str] = ["*"]  # Allow all origins for development in Replit
+    # Security - Configure for production
+    ALLOWED_HOSTS: List[str] = ["*"]  # Allow all hosts for Replit proxy (OK for dev)
+    ALLOWED_ORIGINS: List[str] = ["*"]  # Allow all origins for development in Replit (OK for dev)
 
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100
@@ -128,17 +128,6 @@ class Settings(BaseSettings):
     PRO_PLAN_DOCUMENTS_PER_MONTH: int = 1000
     ENTERPRISE_PLAN_DOCUMENTS_PER_MONTH: int = -1  # unlimited
 
-    # Push Notifications - Firebase Cloud Messaging (FCM)
-    FCM_SERVER_KEY: str = os.getenv("FCM_SERVER_KEY", "")
-    FCM_PROJECT_ID: str = os.getenv("FCM_PROJECT_ID", "")
-    FCM_SERVICE_ACCOUNT_KEY: str = os.getenv("FCM_SERVICE_ACCOUNT_KEY", "")
-
-    # Push Notifications - Apple Push Notification Service (APNS)
-    APNS_TEAM_ID: str = os.getenv("APNS_TEAM_ID", "")
-    APNS_KEY_ID: str = os.getenv("APNS_KEY_ID", "")
-    APNS_PRIVATE_KEY: str = os.getenv("APNS_PRIVATE_KEY", "")
-    APNS_BUNDLE_ID: str = os.getenv("APNS_BUNDLE_ID", "com.mytypist.app")
-    APNS_PRODUCTION: bool = os.getenv("APNS_PRODUCTION", "false").lower() == "true"
 
     class Config:
         env_file = ".env"
