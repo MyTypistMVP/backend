@@ -1,4 +1,4 @@
-modules = ["python-3.11"]
+modules = ["python-3.11", "postgresql-16"]
 [agent]
 expertMode = true
 integrations = ["python_sendgrid:1.0.0", "python_database:1.0.0"]
@@ -36,9 +36,13 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
+localPort = 33713
+externalPort = 3001
+
+[[ports]]
 localPort = 39813
 externalPort = 3000
 
 [deployment]
 deploymentTarget = "vm"
-run = ["gunicorn", "--bind=0.0.0.0:5000", "--worker-class=uvicorn.workers.UvicornWorker", "--workers=2", "main:app"]
+run = ["uv", "run", "python", "main.py"]

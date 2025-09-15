@@ -2,7 +2,7 @@
 
 import enum
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Enum, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, Enum, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -88,7 +88,7 @@ class TicketResponse(Base):
     
     # Can be from staff or user
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    is_staff_response = Column(bool, nullable=False, default=False)
+    is_staff_response = Column(Boolean, nullable=False, default=False)
     
     # For guest responses
     guest_email = Column(String(255), nullable=True)
