@@ -702,10 +702,10 @@ async def track_page_visit(
             "user_agent": user_agent,
             "referrer": referrer
         }
-        
+
         if device_info:
             request_data.update(device_info)
-        
+
         result = await AdminDashboardService.track_page_visit(
             db=db,
             page_path=page_path,

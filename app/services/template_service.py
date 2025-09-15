@@ -1,3 +1,11 @@
+# --- MISSING FUNCTION STUBS FOR ERROR TRACKING ---
+def process_extraction_file(file, *args, **kwargs):
+    """Stub for process_extraction_file. TODO: Implement actual logic."""
+    raise NotImplementedError("process_extraction_file is not yet implemented.")
+
+def process_preview_file(file, *args, **kwargs):
+    """Stub for process_preview_file. TODO: Implement actual logic."""
+    raise NotImplementedError("process_preview_file is not yet implemented.")
 """
 Template management and processing service
 """
@@ -41,11 +49,11 @@ def monitor_performance(operation_name: str):
 
 class TemplateLoader:
     """Service for optimized template loading using BatchProcessService"""
-    
+
     def __init__(self, batch_service: Optional[BatchProcessService] = None):
         """Initialize loader with batch processing service"""
         self.batch_service = batch_service or BatchProcessService(CacheService())
-        
+
     @monitor_performance('load_single')
     async def load_template(self, db: Session, template_id: int) -> Optional[Template]:
         """Load a template with caching and performance monitoring"""
@@ -56,28 +64,28 @@ class TemplateLoader:
         except Exception as e:
             logger.error(f"Error loading template {template_id}: {str(e)}")
             raise
-    
+
     @monitor_performance('load_bulk')
     async def load_templates_bulk(self, db: Session, template_ids: List[int], batch_size: int = 50) -> List[Template]:
         """Load multiple templates efficiently using batch service"""
         try:
             # Use batch service to load and cache templates in batches
             templates = []
-            
+
             # Process in batches to avoid overwhelming the system
             for i in range(0, len(template_ids), batch_size):
                 batch = template_ids[i:i + batch_size]
                 results = await self.batch_service.preload_templates(db, batch)
-                
+
                 for template_id in batch:
                     if template_id in results:
                         templates.append(Template(**results[template_id]))
-            
+
             return templates
         except Exception as e:
             logger.error(f"Error loading templates in bulk: {str(e)}")
             raise
-    
+
     @monitor_performance('search')
     async def search_templates(self, db: Session, query: str, filters: Dict[str, Any] = None) -> List[Template]:
         """Search templates with caching"""
@@ -88,7 +96,7 @@ class TemplateLoader:
         except Exception as e:
             logger.error(f"Error searching templates: {str(e)}")
             raise
-            
+
     @monitor_performance('update')
     async def update_template(self, db: Session, template_id: int, updates: Dict[str, Any]) -> Optional[Template]:
         """Update template with proper cache invalidation"""
@@ -102,9 +110,9 @@ class TemplateLoader:
         for template_id in template_ids:
             if template_id in results:
                 templates.append(Template(**results[template_id]))
-        
+
         return templates
-    
+
     @staticmethod
     async def preload_templates(db: Session, category: str = None) -> bool:
         """Preload frequently accessed templates into cache"""
@@ -112,10 +120,10 @@ class TemplateLoader:
             query = db.query(Template).filter(Template.is_active == True)
             if category:
                 query = query.filter(Template.category == category)
-                
+
             templates = query.order_by(desc(Template.usage_count)).limit(100).all()
             template_ids = [t.id for t in templates]
-            
+
             # Use batch service for preloading
             batch_service = BatchProcessService(CacheService())
             await batch_service.preload_templates(db, template_ids)
@@ -209,63 +217,63 @@ from app.services.batch_process_service import BatchProcessService
 
 class TemplateSimilarityService:
     """Service for template similarity and recommendations"""
-    
+
     @staticmethod
     def find_similar_templates(db: Session, template_id: int, limit: int = 5) -> List[Template]:
         """Find similar templates based on classification and similarity scores"""
         template = db.query(Template).filter(Template.id == template_id).first()
         if not template or not template.similarity_score:
             return []
-            
+
         # Get similar template IDs sorted by similarity score
         similar_ids = sorted(
             [(int(tid), score) for tid, score in template.similarity_score.items()],
             key=lambda x: x[1],
             reverse=True
         )[:limit]
-        
+
         # Fetch similar templates
         similar_templates = []
         for tid, _ in similar_ids:
             similar = db.query(Template).filter(Template.id == tid).first()
             if similar and similar.is_active:
                 similar_templates.append(similar)
-                
+
         return similar_templates
-    
+
     @staticmethod
     def get_cluster_templates(db: Session, template_id: int, limit: int = 5) -> List[Template]:
         """Get templates from the same cluster"""
         template = db.query(Template).filter(Template.id == template_id).first()
         if not template or template.cluster_id is None:
             return []
-            
+
         return db.query(Template).filter(
             Template.cluster_id == template.cluster_id,
             Template.id != template_id,
             Template.is_active == True
         ).limit(limit).all()
-    
+
     @staticmethod
     def search_by_keywords(db: Session, keywords: List[str], limit: int = 10) -> List[Template]:
         """Search templates by keywords from their classification"""
         templates = db.query(Template).filter(Template.is_active == True).all()
-        
+
         # Score templates based on keyword matches
         scored_templates = []
         for template in templates:
             if not template.keywords:
                 continue
-                
+
             score = 0
             template_keywords = [k[0].lower() for k in template.keywords]
             for keyword in keywords:
                 if keyword.lower() in template_keywords:
                     score += 1
-                    
+
             if score > 0:
                 scored_templates.append((template, score))
-                
+
         # Return top matching templates
         return [t[0] for t in sorted(scored_templates, key=lambda x: x[1], reverse=True)[:limit]]
 
@@ -274,7 +282,7 @@ logger = logging.getLogger(__name__)
 
 class TemplateService:
     """Template management and processing service"""
-    
+
     ALLOWED_TEMPLATE_EXTENSIONS = ['.docx', '.pdf', '.txt']
     ALLOWED_PREVIEW_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.pdf']
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -303,7 +311,7 @@ class TemplateService:
         try:
             # Validate files
             await TemplateService._validate_template_files(template_file, preview_file)
-            
+
             # Create template record
             template = Template(
                 name=title,
@@ -316,26 +324,26 @@ class TemplateService:
                 file_size=template_file.size or 0,
                 file_hash=hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()
             )
-            
+
             db.add(template)
             db.flush()  # Get template ID
-            
+
             # Store files
             template_path = await StorageService.store_template_file(
-                template_file, 
+                template_file,
                 os.path.join("templates", str(template.id), template_file.filename)
             )
             preview_path = await StorageService.store_preview_file(
                 preview_file,
                 os.path.join("previews", str(template.id), preview_file.filename)
             )
-            
+
             # Update template with file paths
             template.preview_file_path = preview_path
             template.file_path = template_path
-            
+
             db.commit()
-            
+
             # Audit log
             await AuditService.log_action(
                 db,
@@ -344,9 +352,9 @@ class TemplateService:
                 resource_type="template",
                 resource_id=template.id
             )
-            
+
             return template
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"Failed to create template: {str(e)}", exc_info=True)
@@ -368,7 +376,7 @@ class TemplateService:
 
         # Increment preview count
         template.preview_count = getattr(template, 'preview_count', 0) + 1
-        
+
         # Update preview to download rate
         download_count = getattr(template, 'download_count', 0)
         if download_count > 0:
@@ -426,13 +434,13 @@ class TemplateService:
             template = db.query(Template).filter(Template.id == template_id).first()
             if not template:
                 raise HTTPException(status_code=404, detail="Template not found")
-            
+
             # Check if favorite exists
             fav = db.query(TemplateFavorite).filter(
-                TemplateFavorite.template_id == template_id, 
+                TemplateFavorite.template_id == template_id,
                 TemplateFavorite.user_id == user_id
             ).first()
-            
+
             if fav:
                 # Remove favorite
                 db.delete(fav)
@@ -442,10 +450,10 @@ class TemplateService:
                 fav = TemplateFavorite(user_id=user_id, template_id=template_id)
                 db.add(fav)
                 is_favorite = True
-            
+
             db.commit()
             return {"is_favorite": is_favorite}
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"Failed to toggle favorite: {str(e)}")
@@ -466,17 +474,17 @@ class TemplateService:
                 .limit(per_page)
                 .all()
             )
-            
+
             template_ids = [fav.template_id for fav in favs]
             templates = db.query(Template).filter(Template.id.in_(template_ids)).all()
-            
+
             return {
                 "templates": templates,
                 "total": len(favs),
                 "page": page,
                 "per_page": per_page
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to get user favorites: {str(e)}")
             raise HTTPException(
@@ -493,7 +501,7 @@ class TemplateService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Template file failed security validation"
             )
-        
+
         # Validate preview file
         if not validate_file_security(preview_file):
             raise HTTPException(
@@ -512,10 +520,10 @@ class TemplateService:
         # Template creator can edit
         if template.created_by == user_id:
             return True
-        
+
         # Admin users can edit (basic check)
         user = db.query(User).filter(User.id == user_id).first()
         if user and hasattr(user, 'role') and user.role == 'admin':
             return True
-            
+
         return False

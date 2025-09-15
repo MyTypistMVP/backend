@@ -30,7 +30,7 @@ class RetentionMetrics:
 
 class AdminDashboardService:
     """Service for admin dashboard analytics and management"""
-    
+
     # Performance thresholds
     PERFORMANCE_THRESHOLDS = {
         'response_time': {
@@ -54,14 +54,14 @@ class AdminDashboardService:
             'target': 50       # 50%
         }
     }
-    
+
     # Risk scoring thresholds
     CHURN_RISK_THRESHOLDS = {
         'high': 0.7,      # 70%+ chance of churning
         'medium': 0.4,    # 40-70% chance of churning
         'low': 0.2        # 20-40% chance of churning
     }
-    
+
     # Feature weights for recommendations
     RECOMMENDATION_WEIGHTS = {
         'category_affinity': 0.4,
@@ -69,7 +69,7 @@ class AdminDashboardService:
         'popularity': 0.2,
         'completion_rate': 0.1
     }
-    
+
     COHORT_PERIODS = {
         'daily': timedelta(days=1),
         'weekly': timedelta(weeks=1),
@@ -85,21 +85,21 @@ class AdminDashboardService:
 
             # Active users in last 15 minutes from both page and document visits
             page_visitors = set(
-                visit.device_fingerprint for visit in 
+                visit.device_fingerprint for visit in
                 db.query(PageVisit.device_fingerprint).filter(
                     PageVisit.created_at >= fifteen_mins_ago,
                     PageVisit.device_fingerprint.isnot(None)
                 ).all()
             )
-            
+
             doc_visitors = set(
-                visit.device_fingerprint for visit in 
+                visit.device_fingerprint for visit in
                 db.query(DocumentVisit.device_fingerprint).filter(
                     DocumentVisit.created_at >= fifteen_mins_ago,
                     DocumentVisit.device_fingerprint.isnot(None)
                 ).all()
             )
-            
+
             active_users = len(page_visitors.union(doc_visitors))
 
             # Documents being created or viewed now
@@ -148,66 +148,66 @@ class AdminDashboardService:
         total_users = len(user_ids)
         if not total_users:
             return {'trial_to_paid': 0, 'visitor_to_user': 0}
-            
+
         paid_users = db.query(Payment).filter(
             Payment.user_id.in_(user_ids),
             Payment.status == 'completed'
         ).distinct(Payment.user_id).count()
-        
+
         active_users = db.query(User).filter(
             User.id.in_(user_ids),
             User.status == 'active'
         ).count()
-        
+
         return {
             'trial_to_paid': (paid_users / total_users) * 100,
             'visitor_to_user': (active_users / total_users) * 100
         }
-    
+
     @staticmethod
     async def _get_cohort_retention(
-        db: Session, 
-        user_ids: List[int], 
-        start_date: datetime, 
+        db: Session,
+        user_ids: List[int],
+        start_date: datetime,
         end_date: datetime
     ) -> Dict[int, Dict[str, float]]:
         """Calculate detailed retention rates for different periods"""
         retention_rates = {}
         total_users = len(user_ids)
-        
+
         if not total_users:
             return retention_rates
-            
+
         current_date = start_date
         day = 0
-        
+
         while current_date <= end_date:
             # Page visits retention
             page_visitors = set(
-                visit.device_fingerprint for visit in 
+                visit.device_fingerprint for visit in
                 db.query(PageVisit.device_fingerprint).filter(
                     PageVisit.created_at >= current_date,
                     PageVisit.created_at < current_date + timedelta(days=1),
                     PageVisit.device_fingerprint.isnot(None)
                 ).all()
             )
-            
+
             # Document visits retention
             doc_visitors = set(
-                visit.device_fingerprint for visit in 
+                visit.device_fingerprint for visit in
                 db.query(DocumentVisit.device_fingerprint).filter(
                     DocumentVisit.created_at >= current_date,
                     DocumentVisit.created_at < current_date + timedelta(days=1),
                     DocumentVisit.device_fingerprint.isnot(None)
                 ).all()
             )
-            
+
             # Calculate retention rates
             total_visitors = len(page_visitors.union(doc_visitors))
             page_retention = (len(page_visitors) / total_users) * 100
             doc_retention = (len(doc_visitors) / total_users) * 100
             overall_retention = (total_visitors / total_users) * 100
-            
+
             # Store detailed retention metrics
             retention_rates[day] = {
                 'overall_retention': round(overall_retention, 2),
@@ -216,12 +216,12 @@ class AdminDashboardService:
                 'active_visitors': total_visitors,
                 'date': current_date.date().isoformat()
             }
-            
+
             current_date += timedelta(days=1)
             day += 1
-        
+
         return retention_rates
-    
+
     @staticmethod
     async def _get_cohort_revenue(db: Session, user_ids: List[int]) -> Dict[str, float]:
         """Calculate revenue metrics for a cohort"""
@@ -229,14 +229,14 @@ class AdminDashboardService:
             Payment.user_id.in_(user_ids),
             Payment.status == 'completed'
         ).scalar() or 0.0
-        
+
         avg_revenue = total_revenue / len(user_ids) if user_ids else 0
-        
+
         return {
             'total_revenue': total_revenue,
             'average_revenue': avg_revenue
         }
-        
+
     @staticmethod
     async def _calculate_revenue_metrics(db: Session, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
         """Calculate comprehensive revenue metrics including MRR, ARR, LTV"""
@@ -245,7 +245,7 @@ class AdminDashboardService:
             Payment.status == "completed",
             Payment.created_at.between(start_time, end_time)
         ).scalar() or 0.0
-        
+
         # Revenue by product type
         product_revenue = db.query(
             Payment.product_type,
@@ -255,22 +255,22 @@ class AdminDashboardService:
             Payment.status == "completed",
             Payment.created_at.between(start_time, end_time)
         ).group_by(Payment.product_type).all()
-        
+
         # Monthly Recurring Revenue (MRR)
         mrr = db.query(func.sum(Subscription.monthly_amount)).filter(
             Subscription.status == 'active'
         ).scalar() or 0.0
-        
+
         # Annual Recurring Revenue (ARR)
         arr = mrr * 12
-        
+
         # MRR Growth Rate
         past_mrr = db.query(func.sum(Subscription.monthly_amount)).filter(
             Subscription.status == 'active',
             Subscription.created_at < start_time
         ).scalar() or 0.0
         mrr_growth = ((mrr - past_mrr) / past_mrr * 100) if past_mrr > 0 else 0
-        
+
         # Churn metrics
         total_customers = db.query(User).filter(
             User.status == 'active'
@@ -280,15 +280,15 @@ class AdminDashboardService:
             User.updated_at.between(start_time, end_time)
         ).count()
         churn_rate = (churned_customers / total_customers * 100) if total_customers > 0 else 0
-        
+
         # Customer value metrics
         customer_value = await AdminDashboardService._calculate_customer_value_metrics(db, start_time, end_time)
-        
+
         # User acquisition costs and payback period
         acquisition_costs = customer_value.get('acquisition_costs', 0)
         avg_monthly_revenue = mrr / total_customers if total_customers > 0 else 0
         payback_period = acquisition_costs / avg_monthly_revenue if avg_monthly_revenue > 0 else 0
-        
+
         return {
             'total_revenue': total_revenue,
             'product_revenue': {
@@ -312,7 +312,7 @@ class AdminDashboardService:
             },
             'customer_value': customer_value
         }
-    
+
     @staticmethod
     def _calculate_engagement_score(
         page_duration: float,
@@ -325,30 +325,30 @@ class AdminDashboardService:
         norm_page_duration = min(page_duration / (30 * 60), 1.0)
         norm_doc_duration = min(doc_duration / (30 * 60), 1.0)
         time_engagement = (norm_page_duration + norm_doc_duration) / 2
-        
+
         # Action engagement
         # Normalize interactions (assume max 100 interactions per period)
         norm_interactions = min(doc_interactions / 100.0, 1.0)
-        
+
         # Behavioral engagement
         # Bounce rate and session quality
         norm_bounce = 1.0 - (bounce_rate / 100.0)
-        
+
         # Calculate weighted engagement score
         weights = {
             'time': 0.35,      # Time spent engaging with content
             'actions': 0.35,   # Actions taken (interactions)
             'behavior': 0.30   # Behavioral indicators like bounce rate
         }
-        
+
         score = (
             (time_engagement * weights['time']) +
             (norm_interactions * weights['actions']) +
             (norm_bounce * weights['behavior'])
         ) * 100
-        
+
         return round(score, 2)
-    
+
     @staticmethod
     async def _calculate_subscription_metrics(db: Session, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
         """Calculate comprehensive subscription and plan metrics"""
@@ -356,20 +356,20 @@ class AdminDashboardService:
         active_subs = db.query(Subscription).filter(
             Subscription.status == 'active'
         ).count()
-        
+
         new_subs = db.query(Subscription).filter(
             Subscription.created_at.between(start_time, end_time)
         ).count()
-        
+
         churned_subs = db.query(Subscription).filter(
             Subscription.cancelled_at.between(start_time, end_time)
         ).count()
-        
+
         # Revenue metrics
         mrr = db.query(func.sum(Subscription.monthly_amount)).filter(
             Subscription.status == 'active'
         ).scalar() or 0.0
-        
+
         # Breakdown by plan type
         plan_metrics = db.query(
             Subscription.plan_type,
@@ -378,20 +378,20 @@ class AdminDashboardService:
         ).filter(
             Subscription.status == 'active'
         ).group_by(Subscription.plan_type).all()
-        
+
         # Trial metrics
         total_trials = db.query(Subscription).filter(
             Subscription.plan_type == 'trial',
             Subscription.created_at.between(start_time, end_time)
         ).count()
-        
+
         converted_trials = db.query(Subscription).filter(
             Subscription.plan_type != 'trial',
             Subscription.trial_end_date.between(start_time, end_time)
         ).count()
-        
+
         trial_conversion = (converted_trials / total_trials * 100) if total_trials > 0 else 0
-        
+
         # Calculate retention by cohort
         cohort_retention = {}
         cohort_start = start_time
@@ -401,7 +401,7 @@ class AdminDashboardService:
                 Subscription.created_at.between(cohort_start, cohort_end),
                 Subscription.status == 'active'
             ).count()
-            
+
             if cohort > 0:
                 retained = db.query(Subscription).filter(
                     Subscription.created_at.between(cohort_start, cohort_end),
@@ -410,9 +410,9 @@ class AdminDashboardService:
                 ).count()
                 retention_rate = (retained / cohort * 100)
                 cohort_retention[cohort_start.strftime('%Y-%m')] = round(retention_rate, 2)
-            
+
             cohort_start = cohort_end
-        
+
         return {
             'active_subscriptions': active_subs,
             'new_subscriptions': new_subs,
@@ -438,13 +438,13 @@ class AdminDashboardService:
                 new_subs / max(churned_subs, 1), 2
             )  # Growth efficiency metric
         }
-    
+
     @staticmethod
     async def get_system_performance(db: Session, minutes: int = 15) -> Dict[str, Any]:
         """Get comprehensive system performance metrics"""
         end_time = datetime.utcnow()
         start_time = end_time - timedelta(minutes=minutes)
-        
+
         # Get API performance metrics
         api_metrics = db.query(
             func.avg(RequestLog.response_time_ms).label('avg_response_time'),
@@ -461,10 +461,10 @@ class AdminDashboardService:
         ).filter(
             RequestLog.timestamp.between(start_time, end_time)
         ).first()
-        
+
         total_requests = api_metrics.total_requests or 1
         error_rate = ((api_metrics.server_errors + api_metrics.client_errors) / total_requests) * 100
-        
+
         # Get database performance metrics
         db_metrics = db.query(
             func.avg(QueryLog.execution_time_ms).label('avg_query_time'),
@@ -475,7 +475,7 @@ class AdminDashboardService:
         ).filter(
             QueryLog.timestamp.between(start_time, end_time)
         ).first()
-        
+
         # Get cache performance
         cache_metrics = db.query(
             func.sum(case((CacheLog.hit == True, 1))).label('hits'),
@@ -483,12 +483,12 @@ class AdminDashboardService:
         ).filter(
             CacheLog.timestamp.between(start_time, end_time)
         ).first()
-        
+
         cache_hit_rate = (
             (cache_metrics.hits / cache_metrics.total * 100)
             if cache_metrics.total else 0
         )
-        
+
         # Get resource utilization (from system metrics table)
         system_metrics = db.query(
             func.avg(SystemMetric.cpu_usage).label('avg_cpu'),
@@ -499,7 +499,7 @@ class AdminDashboardService:
         ).filter(
             SystemMetric.timestamp.between(start_time, end_time)
         ).first()
-        
+
         # Calculate health status
         api_health = (
             'critical' if api_metrics.avg_response_time > AdminDashboardService.PERFORMANCE_THRESHOLDS['response_time']['critical'] or
@@ -508,7 +508,7 @@ class AdminDashboardService:
                            error_rate > AdminDashboardService.PERFORMANCE_THRESHOLDS['error_rate']['warning']
             else 'healthy'
         )
-        
+
         system_health = (
             'critical' if system_metrics.avg_cpu > AdminDashboardService.PERFORMANCE_THRESHOLDS['cpu_usage']['critical'] or
                         system_metrics.avg_memory > AdminDashboardService.PERFORMANCE_THRESHOLDS['memory_usage']['critical']
@@ -516,7 +516,7 @@ class AdminDashboardService:
                            system_metrics.avg_memory > AdminDashboardService.PERFORMANCE_THRESHOLDS['memory_usage']['warning']
             else 'healthy'
         )
-        
+
         return {
             'api_performance': {
                 'response_times': {
@@ -577,25 +577,25 @@ class AdminDashboardService:
             },
             'timestamp': datetime.utcnow().isoformat()
         }
-    
+
     @staticmethod
     async def _calculate_business_metrics(db: Session, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
         """Calculate comprehensive business metrics"""
         # User engagement metrics
         engagement = await AdminDashboardService._calculate_engagement_metrics(db, start_time, end_time)
-        
+
         # Template usage metrics
         template_metrics = await AdminDashboardService._calculate_template_metrics(db, start_time, end_time)
-        
+
         # Document metrics
         document_metrics = await AdminDashboardService._calculate_document_metrics(db, start_time, end_time)
-        
+
         return {
             'engagement': engagement,
             'templates': template_metrics,
             'documents': document_metrics
         }
-        
+
     @staticmethod
     async def _calculate_engagement_metrics(db: Session, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
         """Calculate comprehensive user engagement metrics including DAU/MAU ratio and feature adoption"""
@@ -604,55 +604,55 @@ class AdminDashboardService:
         dau = db.query(func.count(distinct(User.id))).filter(
             User.last_login_at >= today
         ).scalar() or 0
-        
+
         # Monthly Active Users (MAU)
         mau = db.query(func.count(distinct(User.id))).filter(
             User.last_login_at >= today - timedelta(days=30)
         ).scalar() or 0
-        
+
         # DAU/MAU Ratio (Stickiness)
         stickiness = (dau / mau * 100) if mau > 0 else 0
-        
+
         # Get unique visitors from both types of visits
         page_visitors = set(
-            visit.device_fingerprint for visit in 
+            visit.device_fingerprint for visit in
             db.query(PageVisit.device_fingerprint).filter(
                 PageVisit.created_at.between(start_time, end_time),
                 PageVisit.device_fingerprint.isnot(None)
             ).all()
         )
-        
+
         doc_visitors = set(
-            visit.device_fingerprint for visit in 
+            visit.device_fingerprint for visit in
             db.query(DocumentVisit.device_fingerprint).filter(
                 DocumentVisit.created_at.between(start_time, end_time),
                 DocumentVisit.device_fingerprint.isnot(None)
             ).all()
         )
-        
+
         # Session metrics
         avg_page_duration = db.query(func.avg(PageVisit.time_on_page_seconds)).filter(
             PageVisit.created_at.between(start_time, end_time),
             PageVisit.time_on_page_seconds > 0
         ).scalar() or 0
-        
+
         avg_doc_duration = db.query(func.avg(DocumentVisit.time_reading)).filter(
             DocumentVisit.created_at.between(start_time, end_time),
             DocumentVisit.time_reading > 0
         ).scalar() or 0
-        
+
         # Bounce rates
         total_visits = db.query(func.count()).select_from(PageVisit).filter(
             PageVisit.created_at.between(start_time, end_time)
         ).scalar()
-        
+
         bounced_visits = db.query(func.count()).select_from(PageVisit).filter(
             PageVisit.created_at.between(start_time, end_time),
             PageVisit.bounce.is_(True)
         ).scalar()
-        
+
         bounce_rate = (bounced_visits / total_visits * 100) if total_visits > 0 else 0
-        
+
         # Feature adoption rates
         feature_usage = {
             'template_marketplace': db.query(func.count(distinct(User.id))).join(
@@ -665,13 +665,13 @@ class AdminDashboardService:
                 User.api_key.isnot(None)
             ).scalar()
         }
-        
+
         total_users = db.query(func.count(User.id)).scalar() or 1
         feature_adoption = {
             feature: round(count / total_users * 100, 2)
             for feature, count in feature_usage.items()
         }
-        
+
         # NPS calculation from feedback
         nps_scores = db.query(
             Feedback.score,
@@ -680,15 +680,15 @@ class AdminDashboardService:
             Feedback.created_at.between(start_time, end_time),
             Feedback.type == 'nps'
         ).group_by(Feedback.score).all()
-        
+
         promoters = sum(row.count for row in nps_scores if row.score >= 9)
         detractors = sum(row.count for row in nps_scores if row.score <= 6)
         total_nps = sum(row.count for row in nps_scores)
-        
+
         nps_score = (
             (promoters - detractors) / total_nps * 100
         ) if total_nps > 0 else 0
-        
+
         # User journey analytics
         journey_stages = {
             'signup_complete': db.query(func.count(User.id)).filter(
@@ -702,12 +702,12 @@ class AdminDashboardService:
                 Subscription.status == 'active'
             ).scalar()
         }
-        
+
         journey_conversion = {
             stage: round(count / total_users * 100, 2)
             for stage, count in journey_stages.items()
         }
-        
+
         return {
             'activity_metrics': {
                 'dau': dau,
@@ -740,7 +740,7 @@ class AdminDashboardService:
                 ).count()
             )
         }
-    
+
     @staticmethod
     async def _calculate_template_metrics(db: Session, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
         """Calculate comprehensive template usage and performance metrics"""
@@ -748,7 +748,7 @@ class AdminDashboardService:
         templates_created = db.query(Template).filter(
             Template.created_at.between(start_time, end_time)
         ).count()
-        
+
         # Template usage and popularity
         template_usage = db.query(
             Template.id,
@@ -760,7 +760,7 @@ class AdminDashboardService:
         ).outerjoin(Document).filter(
             Document.created_at.between(start_time, end_time)
         ).group_by(Template.id).all()
-        
+
         # Category performance
         category_metrics = db.query(
             TemplateCategory.name,
@@ -770,7 +770,7 @@ class AdminDashboardService:
         ).join(Template).join(Document).filter(
             Document.created_at.between(start_time, end_time)
         ).group_by(TemplateCategory.name).all()
-        
+
         # Search analytics
         search_patterns = db.query(
             SearchLog.query,
@@ -783,7 +783,7 @@ class AdminDashboardService:
         ).filter(
             SearchLog.created_at.between(start_time, end_time)
         ).group_by(SearchLog.query).all()
-        
+
         # Template performance metrics
         performance_metrics = db.query(
             Template.id,
@@ -795,7 +795,7 @@ class AdminDashboardService:
             )).label('abandonments'),
             func.avg(Document.user_satisfaction_score).label('avg_satisfaction')
         ).join(Document).group_by(Template.id).all()
-        
+
         return {
             'summary': {
                 'templates_created': templates_created,
@@ -850,7 +850,7 @@ class AdminDashboardService:
                 for p in performance_metrics
             }
         }
-    
+
     @staticmethod
     async def _calculate_document_metrics(db: Session, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
         """Calculate comprehensive document creation, usage, and performance metrics"""
@@ -858,12 +858,12 @@ class AdminDashboardService:
         total_documents = db.query(Document).filter(
             Document.created_at.between(start_time, end_time)
         ).count()
-        
+
         completed_documents = db.query(Document).filter(
             Document.created_at.between(start_time, end_time),
             Document.status == 'completed'
         ).count()
-        
+
         # Document performance metrics
         completion_time_stats = db.query(
             func.avg(Document.completion_time_seconds).label('avg_time'),
@@ -876,7 +876,7 @@ class AdminDashboardService:
             Document.status == 'completed',
             Document.created_at.between(start_time, end_time)
         ).first()
-        
+
         # Document status distribution
         status_counts = db.query(
             Document.status,
@@ -884,7 +884,7 @@ class AdminDashboardService:
         ).filter(
             Document.created_at.between(start_time, end_time)
         ).group_by(Document.status).all()
-        
+
         # Error analysis
         error_analysis = db.query(
             Document.error_type,
@@ -894,7 +894,7 @@ class AdminDashboardService:
             Document.status == 'error',
             Document.created_at.between(start_time, end_time)
         ).group_by(Document.error_type).all()
-        
+
         # User satisfaction metrics
         satisfaction_stats = db.query(
             func.avg(Document.user_satisfaction_score).label('avg_score'),
@@ -903,7 +903,7 @@ class AdminDashboardService:
             Document.created_at.between(start_time, end_time),
             Document.user_satisfaction_score.isnot(None)
         ).first()
-        
+
         # Document revision metrics
         revision_stats = db.query(
             func.avg(Document.revision_count).label('avg_revisions'),
@@ -911,7 +911,7 @@ class AdminDashboardService:
         ).filter(
             Document.created_at.between(start_time, end_time)
         ).first()
-        
+
         # Time savings analysis
         time_savings = db.query(
             func.sum(Document.estimated_time_saved_minutes).label('total_saved'),
@@ -920,7 +920,7 @@ class AdminDashboardService:
             Document.created_at.between(start_time, end_time),
             Document.estimated_time_saved_minutes.isnot(None)
         ).first()
-        
+
         return {
             'volume_metrics': {
                 'total_documents': total_documents,
@@ -979,19 +979,19 @@ class AdminDashboardService:
         paying_users = db.query(Payment.user_id).distinct().filter(
             Payment.status == 'completed'
         ).count()
-        
+
         # Total revenue from completed payments
         total_revenue = db.query(func.sum(Payment.amount)).filter(
             Payment.status == 'completed'
         ).scalar() or 0.0
-        
+
         # Average revenue per user
         arpu = total_revenue / paying_users if paying_users else 0
-        
+
         # Customer acquisition costs (marketing + onboarding costs)
         # TODO: Replace with actual marketing cost tracking when implemented
         estimated_acquisition_cost = 5000  # Placeholder cost in currency units
-        
+
         # Calculate average customer lifetime in months
         customer_lifetimes = db.query(
             (func.julianday(User.updated_at) - func.julianday(User.created_at)) / 30
@@ -1002,18 +1002,18 @@ class AdminDashboardService:
             sum(lifetime[0] for lifetime in customer_lifetimes) / len(customer_lifetimes)
             if customer_lifetimes else 12  # Default to 12 months if no churn data
         )
-        
+
         # Calculate LTV using average customer lifetime and ARPU
         customer_ltv = arpu * avg_lifetime_months
-        
+
         # Get upgrade rates
         total_upgrades = db.query(func.count()).filter(
             SubscriptionChange.change_type == 'upgrade',
             SubscriptionChange.created_at.between(start_time, end_time)
         ).scalar() or 0
-        
+
         upgrade_rate = (total_upgrades / paying_users * 100) if paying_users else 0
-        
+
         return {
             'lifetime_value': round(customer_ltv, 2),
             'average_customer_value': round(arpu, 2),
@@ -1023,7 +1023,7 @@ class AdminDashboardService:
             'avg_lifetime_months': round(avg_lifetime_months, 2),
             'upgrade_rate': round(upgrade_rate, 2)
         }
-    
+
     @staticmethod
     async def calculate_churn_risk(db: Session, user_id: int) -> Dict[str, Any]:
         """Calculate churn risk score and factors for a user"""
@@ -1031,10 +1031,10 @@ class AdminDashboardService:
         user = db.query(User).get(user_id)
         if not user:
             return {"error": "User not found"}
-            
+
         # Calculate days since last activity
         days_inactive = (datetime.utcnow() - user.last_login_at).days
-        
+
         # Get recent engagement metrics
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         engagement = db.query(
@@ -1051,13 +1051,13 @@ class AdminDashboardService:
                 DocumentVisit.created_at >= thirty_days_ago
             )
         ).first()
-        
+
         # Get subscription status
         subscription = db.query(Subscription).filter(
             Subscription.user_id == user_id,
             Subscription.status == 'active'
         ).first()
-        
+
         # Calculate feature usage decline
         recent_feature_usage = await AdminDashboardService._calculate_feature_usage(
             db, user_id, days=30
@@ -1065,12 +1065,12 @@ class AdminDashboardService:
         previous_feature_usage = await AdminDashboardService._calculate_feature_usage(
             db, user_id, days=60, offset=30
         )
-        
+
         feature_decline = (
             (previous_feature_usage - recent_feature_usage) / previous_feature_usage
             if previous_feature_usage > 0 else 0
         )
-        
+
         # Calculate risk factors
         risk_factors = {
             'inactivity': min(days_inactive / 30, 1.0),
@@ -1082,7 +1082,7 @@ class AdminDashboardService:
             ),
             'feature_decline': feature_decline
         }
-        
+
         # Calculate weighted risk score
         weights = {
             'inactivity': 0.4,
@@ -1090,12 +1090,12 @@ class AdminDashboardService:
             'session_time': 0.2,
             'feature_decline': 0.1
         }
-        
+
         risk_score = sum(
             score * weights[factor]
             for factor, score in risk_factors.items()
         )
-        
+
         # Determine risk level
         risk_level = (
             'high' if risk_score >= AdminDashboardService.CHURN_RISK_THRESHOLDS['high']
@@ -1103,7 +1103,7 @@ class AdminDashboardService:
             else 'low' if risk_score >= AdminDashboardService.CHURN_RISK_THRESHOLDS['low']
             else 'minimal'
         )
-        
+
         return {
             'risk_score': round(risk_score * 100, 2),
             'risk_level': risk_level,
@@ -1129,7 +1129,7 @@ class AdminDashboardService:
                 } if risk_factors['feature_decline'] > 0.3 else None
             ]
         }
-    
+
     @staticmethod
     async def get_template_recommendations(
         db: Session,
@@ -1144,12 +1144,12 @@ class AdminDashboardService:
         ).filter(
             Document.user_id == user_id
         ).group_by(Document.template_id).all()
-        
+
         # Get user's role and industry
         user = db.query(User).get(user_id)
         if not user:
             return []
-            
+
         # Calculate category affinity
         category_usage = db.query(
             Template.category,
@@ -1157,12 +1157,12 @@ class AdminDashboardService:
         ).join(Document).filter(
             Document.user_id == user_id
         ).group_by(Template.category).all()
-        
+
         preferred_categories = {
             cat.category: cat.usage_count
             for cat in category_usage
         }
-        
+
         # Get global template popularity
         popular_templates = db.query(
             Template,
@@ -1170,26 +1170,26 @@ class AdminDashboardService:
             func.avg(Document.user_satisfaction_score).label('satisfaction'),
             func.count(distinct(Document.user_id)).label('unique_users')
         ).join(Document).group_by(Template.id).all()
-        
+
         # Calculate recommendation scores
         recommendations = []
         for template in popular_templates:
             # Skip templates already used by user
             if template.Template.id in [t.template_id for t in user_templates]:
                 continue
-                
+
             # Category affinity score
             category_score = (
                 preferred_categories.get(template.Template.category, 0) /
                 max(preferred_categories.values()) if preferred_categories else 0
             )
-            
+
             # Role match score
             role_score = 1.0 if template.Template.target_role == user.role else 0.5
-            
+
             # Popularity score
             popularity_score = template.usage_count / max(t.usage_count for t in popular_templates)
-            
+
             # Completion rate score
             completion_rate = (
                 db.query(
@@ -1199,7 +1199,7 @@ class AdminDashboardService:
                     Document.template_id == template.Template.id
                 ).scalar() or 0
             )
-            
+
             # Calculate weighted score
             total_score = (
                 category_score * AdminDashboardService.RECOMMENDATION_WEIGHTS['category_affinity'] +
@@ -1207,7 +1207,7 @@ class AdminDashboardService:
                 popularity_score * AdminDashboardService.RECOMMENDATION_WEIGHTS['popularity'] +
                 completion_rate * AdminDashboardService.RECOMMENDATION_WEIGHTS['completion_rate']
             )
-            
+
             recommendations.append({
                 'template_id': template.Template.id,
                 'name': template.Template.name,
@@ -1220,10 +1220,10 @@ class AdminDashboardService:
                     'unique_users': template.unique_users
                 }
             })
-        
+
         # Sort by score and return top N
         return sorted(recommendations, key=lambda x: x['score'], reverse=True)[:limit]
-    
+
     @staticmethod
     async def _calculate_feature_usage(
         db: Session,
@@ -1234,7 +1234,7 @@ class AdminDashboardService:
         """Calculate normalized feature usage score for a time period"""
         end_date = datetime.utcnow() - timedelta(days=offset)
         start_date = end_date - timedelta(days=days)
-        
+
         # Count different types of feature usage
         feature_usage = db.query(
             func.count(distinct(Document.id)).label('documents'),
@@ -1255,28 +1255,28 @@ class AdminDashboardService:
                 Subscription.created_at.between(start_date, end_date)
             )
         ).first()
-        
+
         # Normalize usage (assume max 100 interactions per feature type per month)
         normalized_usage = sum(
             min(getattr(feature_usage, feature) / 100, 1.0)
             for feature in ['documents', 'templates', 'pages', 'subscriptions']
         ) / 4  # Average across feature types
-        
+
         return normalized_usage
-    
+
     @staticmethod
     async def get_cohort_analysis(db: Session, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """Get detailed cohort analysis for a specific date range"""
         try:
             cohorts = {}
             current_date = start_date
-            
+
             while current_date <= end_date:
                 # Get users who joined on this date
                 new_users = db.query(User).filter(
                     func.date(User.created_at) == current_date.date()
                 ).all()
-                
+
                 if new_users:
                     user_ids = [u.id for u in new_users]
                     cohort_metrics = {
@@ -1286,9 +1286,9 @@ class AdminDashboardService:
                         'revenue': await AdminDashboardService._get_cohort_revenue(db, user_ids)
                     }
                     cohorts[current_date.strftime('%Y-%m-%d')] = cohort_metrics
-                
+
                 current_date += timedelta(days=1)
-            
+
             return cohorts
         except Exception as e:
             logger.error(f"Failed to get cohort analysis: {e}")
@@ -1300,7 +1300,7 @@ class AdminDashboardService:
         retention = RetentionMetrics()
         end_date = date
         start_date = end_date - timedelta(days=90)  # 90 days of history
-        
+
         # Get all user activity in period
         user_activity = db.query(
             User.id,
@@ -1309,49 +1309,49 @@ class AdminDashboardService:
         ).join(PageVisit).filter(
             User.created_at.between(start_date, end_date)
         ).all()
-        
+
         # Calculate retention by periods
         for period_name, period_delta in AdminDashboardService.COHORT_PERIODS.items():
             cohorts = {}
             current_date = start_date
-            
+
             while current_date <= end_date:
                 period_end = current_date + period_delta
-                
+
                 # Get new users in this period
                 new_users = set(
-                    user.id for user in user_activity 
+                    user.id for user in user_activity
                     if current_date <= user.created_at < period_end
                 )
-                
+
                 if new_users:
                     retained_users = {}
                     check_date = period_end
                     period_number = 1
-                    
+
                     # Calculate retention for subsequent periods
                     while check_date <= end_date:
                         active_users = set(
                             user.id for user in user_activity
-                            if user.id in new_users and 
+                            if user.id in new_users and
                             check_date <= user.visit_date < (check_date + period_delta)
                         )
-                        
+
                         retained_users[period_number] = {
                             'count': len(active_users),
                             'percentage': (len(active_users) / len(new_users)) * 100
                         }
-                        
+
                         check_date += period_delta
                         period_number += 1
-                    
+
                     cohorts[current_date.strftime('%Y-%m-%d')] = {
                         'new_users': len(new_users),
                         'retention': retained_users
                     }
-                
+
                 current_date += period_delta
-            
+
             # Store cohort analysis
             if period_name == 'daily':
                 retention.daily = cohorts
@@ -1359,9 +1359,9 @@ class AdminDashboardService:
                 retention.weekly = cohorts
             else:
                 retention.monthly = cohorts
-        
+
         return retention
-    
+
     @staticmethod
     async def get_daily_summary(db: Session, date: datetime) -> Dict[str, Any]:
         """Get or generate daily analytics summary"""
@@ -1396,20 +1396,20 @@ class AdminDashboardService:
             revenue_metrics = await AdminDashboardService._calculate_revenue_metrics(
                 db, start_of_day, end_of_day
             )
-            
+
             # Enhanced Business Metrics
             business_metrics = await AdminDashboardService._calculate_business_metrics(
                 db, start_of_day, end_of_day
             )
-            
+
             # Visit metrics with enhanced tracking
             visit_metrics = await AdminDashboardService._calculate_visit_metrics(
                 db, start_of_day, end_of_day
             )
-            
+
             # Get retention metrics
             retention = await AdminDashboardService.calculate_retention_metrics(db, date)
-            
+
             # Create summary record
             summary = AnalyticsSummary(
                 date=date,
@@ -1422,11 +1422,11 @@ class AdminDashboardService:
                 unique_visitors=len(set(v.session_id for v in visits)),
                 avg_visit_duration=sum(v.visit_duration for v in visits) / len(visits) if visits else 0
             )
-            
+
             db.add(summary)
             await db.commit()
             await db.refresh(summary)
-            
+
             return {
                 "date": date.isoformat(),
                 "metrics": {
@@ -1482,36 +1482,36 @@ class AnalyticsSummary(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     date = Column(DateTime, nullable=False, index=True)
-    
+
     # User metrics
     total_users = Column(Integer, default=0)
     new_users = Column(Integer, default=0)
     active_users = Column(Integer, default=0)
-    
+
     # Document metrics
     documents_created = Column(Integer, default=0)
     documents_downloaded = Column(Integer, default=0)
     template_submissions = Column(Integer, default=0)
-    
+
     # Revenue metrics
     revenue_amount = Column(Float, default=0.0)
     revenue_currency = Column(String(3), default="NGN")
     subscription_revenue = Column(Float, default=0.0)
     pay_as_you_go_revenue = Column(Float, default=0.0)
-    
+
     # Visit metrics
     total_visits = Column(Integer, default=0)
     unique_visitors = Column(Integer, default=0)
     avg_visit_duration = Column(Float, default=0.0)  # seconds
     bounce_rate = Column(Float, default=0.0)  # percentage
-    
+
     # Most visited pages (JSON array of {path, count})
     top_pages = Column(Text, nullable=True)
-    
+
     # Performance metrics
     avg_response_time = Column(Float, default=0.0)  # milliseconds
     error_count = Column(Integer, default=0)
-    
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

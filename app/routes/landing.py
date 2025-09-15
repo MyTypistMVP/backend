@@ -68,7 +68,7 @@ async def track_page_interaction(request: Request, db: Session, interaction_data
             **interaction_data,
             **session_info
         }
-        
+
         await RealtimeAnalyticsService.track_user_interaction(
             db=db,
             session_id=session_info["session_id"],
@@ -96,7 +96,7 @@ async def track_landing_visit(
         }
 
         utm_params = {k: v for k, v in utm_params.items() if v is not None}
-        
+
         result = LandingPageService.track_landing_visit(
             db=db,
             session_id=session_info["session_id"],
@@ -673,7 +673,7 @@ def _generate_template_preview(db: Session, template, demo_data: Dict[str, Any])
         from app.services.document_service import DocumentService
         from app.services.cache_service import CacheService
         from app.services.thumbnail_service import ThumbnailService
-        
+
         # Try to get from cache first
         cache_key = f"preview:{template.id}:{hash(frozenset(demo_data.items()))}"
         cached_preview = CacheService.get(cache_key)
@@ -686,7 +686,7 @@ def _generate_template_preview(db: Session, template, demo_data: Dict[str, Any])
             validate=True,
             sanitize=True
         )
-        
+
         # Enhance placeholders with smart suggestions and validation
         enhanced_placeholders = []
         for placeholder in placeholders:

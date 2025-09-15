@@ -30,7 +30,7 @@ class LandingPageTemplate(Base):
     is_featured = Column(Boolean, default=False, index=True)
     landing_title = Column(String(200), nullable=True)  # Custom title for landing page
     landing_description = Column(Text, nullable=True)  # Custom description
-    
+
     # SEO Metadata
     meta_title = Column(String(200), nullable=True)  # SEO-optimized title
     meta_description = Column(String(500), nullable=True)  # SEO meta description
@@ -54,13 +54,13 @@ class LandingPageTemplate(Base):
     bounce_count = Column(Integer, default=0)  # How many left without interaction
     avg_time_to_convert = Column(Float, default=0)  # Average time to complete registration
     completion_rate = Column(Float, default=0)  # % of started docs that complete
-    
+
     # Social proof
     total_documents_created = Column(Integer, default=0)  # Total docs created from this template
     avg_rating = Column(Float, default=0)  # Average user rating
     review_count = Column(Integer, default=0)  # Number of reviews
     last_used_at = Column(DateTime, nullable=True)  # Last time template was used
-    
+
     # Performance optimization
     cache_key = Column(String(100), nullable=True, index=True)  # For efficient caching
     cache_updated_at = Column(DateTime, nullable=True)  # Last cache update
@@ -70,7 +70,7 @@ class LandingPageTemplate(Base):
     is_public = Column(Boolean, default=True, index=True)  # Whether visible to guests
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Security and rate limiting
     max_daily_uses = Column(Integer, default=1000)  # Prevent abuse
     current_daily_uses = Column(Integer, default=0)
@@ -79,13 +79,12 @@ class LandingPageTemplate(Base):
 
 class LandingPageService:
     """Service for managing landing page experience and conversions"""
-
     @staticmethod
     def track_landing_visit(
-        db: Session,
-        session_id: str,
-        request: Optional[Request] = None,
-        utm_params: Optional[Dict[str, str]] = None
+            db: Session,
+            session_id: str,
+            request: Optional[Request] = None,
+            utm_params: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """Track a new landing page visit"""
         try:
@@ -119,10 +118,11 @@ class LandingPageService:
                     "utm_term": utm_params.get("utm_term"),
                     "utm_content": utm_params.get("utm_content")
                 })
+            # ...existing code...
 
             # Use shared tracking service to enrich visit data
             visit_data = VisitTrackingService.enrich_visit_data(request_data)
-            
+
             # Create visit record with enriched data
             visit = LandingVisit(
                 session_id=session_id,
@@ -290,7 +290,7 @@ class LandingPageService:
             if visit:
                 # Update viewed templates
                 current_interactions = visit.metadata.get("template_interactions", []) if visit.metadata else []
-                
+
                 # Add new template view
                 template_view = {
                     "template_id": template_id,
@@ -298,7 +298,7 @@ class LandingPageService:
                     "timestamp": datetime.utcnow().isoformat()
                 }
                 current_interactions.append(template_view)
-                
+
                 # Update visit metadata
                 visit.metadata = visit.metadata or {}
                 visit.metadata["template_interactions"] = current_interactions
@@ -405,15 +405,15 @@ class LandingPageService:
                     "template_id": template_id,
                     "template_name": template.name
                 })
-                
+
                 # Update funnel metrics
                 visit.engagement_depth += 1
                 visit.bounce = False
                 visit.funnel_stage = "document_creation"
-                
+
                 # Calculate new conversion probability
                 visit.conversion_probability = LandingPageService._calculate_conversion_probability(visit)
-                
+
                 db.commit()
 
             logger.info(f"Free document creation initiated: draft {draft_result['draft_id']} for template {template_id}")
@@ -446,10 +446,10 @@ class LandingPageService:
             # Input validation and sanitization
             from app.utils.validation import validate_registration_data
             from app.utils.security import sanitize_user_input
-            
+
             sanitized_data = sanitize_user_input(user_data)
             validation_result = validate_registration_data(sanitized_data)
-            
+
             if not validation_result["valid"]:
                 return {
                     "success": False,
@@ -527,20 +527,20 @@ class LandingPageService:
                     "registered_at": datetime.utcnow().isoformat(),
                     "user_id": user_id,
                 })
-                
+
                 # Update conversion metrics
                 visit.funnel_stage = "registered"
                 visit.engagement_depth += 1
                 visit.conversion_probability = 1.0  # Converted
-                
+
                 # Get list of viewed templates from interactions
                 template_interactions = visit.metadata.get("template_interactions", [])
                 viewed_template_ids = list(set(
-                    interaction["template_id"] 
-                    for interaction in template_interactions 
+                    interaction["template_id"]
+                    for interaction in template_interactions
                     if interaction["action"] == "view"
                 ))
-                
+
                 # Update template conversion stats
                 if viewed_template_ids:
                     db.query(LandingPageTemplate).filter(
@@ -550,7 +550,7 @@ class LandingPageService:
                         synchronize_session=False
                     )
                     db.commit()
-                
+
                 db.commit()
 
             # Finalize free document for download
@@ -610,21 +610,21 @@ class LandingPageService:
             for visit in visits:
                 # Check funnel stages from metadata
                 funnel_data = visit.metadata.get("funnel", {}) if visit.metadata else {}
-                
+
                 # Count conversions (registrations)
                 if visit.funnel_stage == "registered":
                     conversions += 1
-                
+
                 # Count document creations
                 if funnel_data.get("document_created"):
                     document_creations += 1
-                
+
                 # Count bounces and engagement
                 if visit.bounce:
                     bounce_count += 1
                 if visit.time_on_page_seconds:
                     total_engagement_time += visit.time_on_page_seconds
-                
+
                 # Track funnel stages
                 funnel_stages["viewed"] += 1
                 if visit.templates_viewed_count and visit.templates_viewed_count > 0:
